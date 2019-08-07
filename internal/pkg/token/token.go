@@ -1,4 +1,4 @@
-package command
+package token
 
 import (
 	"bufio"
@@ -20,7 +20,9 @@ const (
 )
 
 var (
-	ProtocolSeps = []byte("\r\n")
+	ProtocolSeps       = []byte("\r\n")
+	NilData            = []byte("-1\r\n")
+	NilBulkedLen int64 = -1
 )
 
 type Argument struct {
@@ -28,11 +30,24 @@ type Argument struct {
 	data  interface{}
 }
 
-func NewStringArgument(s string) *Argument {
-	return &Argument{
-		label: LabelString,
-		data:  s,
-	}
+func NewString(s string) *Argument {
+	return &Argument{LabelString, s}
+}
+
+func NewError(s string) *Argument {
+	return &Argument{LabelError, s}
+}
+
+func NewInteger(num int64) *Argument {
+	return &Argument{LabelInteger, num}
+}
+
+func NewBulked(data []byte) *Argument {
+	return &Argument{LabelBulked, data}
+}
+
+func NewArray(arguments []*Argument) *Argument {
+	return &Argument{LabelArray, arguments}
 }
 
 func readUntil(reader *bufio.Reader, seps []byte) (line []byte, err error) {
@@ -57,37 +72,31 @@ func parseItem(reader *bufio.Reader) (*Argument, error) {
 		return nil, errors.New("row empty")
 	}
 	label := row[0]
+	row = row[1:]
 	switch label {
 	case LabelString, LabelError:
-		return &Argument{
-			label: label,
-			data:  string(row[1:]),
-		}, nil
+		return &Argument{label: label, data: string(row),}, nil
 	case LabelInteger:
-		num, err := strconv.ParseInt(string(row[1:]), 10, 64)
+		num, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		return &Argument{
-			label: LabelInteger,
-			data:  num,
-		}, nil
+		return &Argument{label: LabelInteger, data: num,}, nil
 	case LabelBulked:
-		n, err := strconv.ParseInt(string(row[1:]), 10, 64)
+		n, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
+		}
+		if n == NilBulkedLen {
+			return &Argument{label: LabelBulked, data: nil}, nil
 		}
 		data := make([]byte, n)
-		_, err = reader.Read(data)
-		if err != nil {
+		if _, err = reader.Read(data); err != nil {
 			return nil, err
 		}
-		return &Argument{
-			label: LabelBulked,
-			data:  data,
-		}, nil
+		return &Argument{label: LabelBulked, data: data,}, nil
 	case LabelArray:
-		n, err := strconv.ParseInt(string(row[1:]), 10, 64)
+		n, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
 		}
@@ -100,10 +109,7 @@ func parseItem(reader *bufio.Reader) (*Argument, error) {
 			}
 			arguments = append(arguments, argument)
 		}
-		return &Argument{
-			label: LabelArray,
-			data:  arguments,
-		}, nil
+		return &Argument{label: LabelArray, data: arguments,}, nil
 	}
 	return nil, nil
 }
@@ -120,12 +126,11 @@ func Parse(conn net.Conn) ([]Argument, error) {
 }
 
 func Compose(argument *Argument) ([]byte, error) {
-	const ErrorMsg = "cast argument data to %v error, data: %v"
+	const ErrorMsg = "cast token data to %v error, data: %v"
 	if argument == nil {
-		argument = &Argument{
-			label: LabelBulked,
-			data:  nil,
-		}
+		data := []byte{LabelBulked}
+		data = append(data, NilData...)
+		return data, nil
 	}
 	data := []byte{argument.label}
 	src := argument.data

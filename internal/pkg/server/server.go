@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
+	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
 type Server struct {
@@ -34,7 +34,7 @@ func (s *Server) Serve() error {
 			return err
 		}
 		go func(conn net.Conn) {
-			_, err = command.Parse(conn)
+			_, err = token.Parse(conn)
 			if err != nil {
 				glog.Errorf("parse: %v", err)
 			}

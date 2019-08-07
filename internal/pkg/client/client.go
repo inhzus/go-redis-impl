@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
+	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
 type Option struct {
@@ -42,7 +42,7 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) Request(argument *command.Argument) {
+func (c *Client) Request(argument *token.Argument) {
 	if c.conn == nil {
 		if err := c.Connect(); err != nil {
 			glog.Error(err)
@@ -50,7 +50,7 @@ func (c *Client) Request(argument *command.Argument) {
 		}
 		defer func() { _ = c.Close() }()
 	}
-	data, err := command.Compose(argument)
+	data, err := token.Compose(argument)
 	if err != nil {
 		glog.Error(err)
 		return
