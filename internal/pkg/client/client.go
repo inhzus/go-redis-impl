@@ -3,7 +3,6 @@ package client
 import (
 	"net"
 
-	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -15,6 +14,7 @@ type Option struct {
 type Client struct {
 	option *Option
 	conn   net.Conn
+	
 }
 
 func NewClient(option *Option) *Client {
@@ -38,23 +38,28 @@ func (c *Client) Connect() (err error) {
 }
 
 func (c *Client) Close() error {
-	return c.conn.Close()
+	if c.conn != nil {
+		return c.conn.Close()
+	} else {
+		return nil
+	}
 }
 
-func (c *Client) Request(t *token.Token) {
+func (c *Client) Request(t *token.Token) (*token.Token, error) {
 	if c.conn == nil {
 		if err := c.Connect(); err != nil {
-			glog.Error(err)
-			return
+			return nil, err
 		}
 		defer func() { _ = c.Close() }()
 	}
-	data, err := token.Serialize(t)
+	data, err := t.Serialize()
 	if err != nil {
-		glog.Error(err)
-		return
+		return nil, err
 	}
-	_, _ = c.conn.Write(data)
+	_, err = c.conn.Write(data)
+	if err != nil {
+		return nil, err
+	}
 	rsp, _ := token.Deserialize(c.conn)
-	glog.Infof("response t: %+v", rsp)
+	return rsp, nil
 }

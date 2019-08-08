@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -21,6 +22,7 @@ var (
 	NilData            = []byte("-1\r\n")
 	NilBulkedLen int64 = -1
 	ErrorDefault       = NewError("error")
+	ReplyOk            = NewString("ok")
 )
 
 type Token struct {
@@ -121,16 +123,16 @@ func Deserialize(conn net.Conn) (*Token, error) {
 	return token, nil
 }
 
-func Serialize(token *Token) ([]byte, error) {
-	const ErrorMsg = "cast token Data to %v error, Data: %v"
-	if token == nil {
+func (t *Token) Serialize() ([]byte, error) {
+	const ErrorMsg = "cast t Data to %v error, Data: %v"
+	if t == nil {
 		data := []byte{LabelBulked}
 		data = append(data, NilData...)
 		return data, nil
 	}
-	data := []byte{token.Label}
-	src := token.Data
-	switch token.Label {
+	data := []byte{t.Label}
+	src := t.Data
+	switch t.Label {
 	case LabelArray:
 		array, ok := src.([]*Token)
 		if !ok {
@@ -139,7 +141,7 @@ func Serialize(token *Token) ([]byte, error) {
 		data = append(data, strconv.FormatInt(int64(len(array)), 10)...)
 		data = append(data, ProtocolSeps...)
 		for _, arg := range array {
-			item, err := Serialize(arg)
+			item, err := arg.Serialize()
 			if err != nil {
 				return nil, err
 			}
@@ -170,4 +172,11 @@ func Serialize(token *Token) ([]byte, error) {
 		data = append(data, ProtocolSeps...)
 	}
 	return data, nil
+}
+
+func (t *Token) Format() (s string) {
+	if row, err := t.Serialize(); err == nil {
+		return strings.ReplaceAll(string(row), "\r\n", " ")
+	}
+	return
 }

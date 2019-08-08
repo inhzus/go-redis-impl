@@ -12,22 +12,20 @@ import (
 type Option struct {
 	Proto   string
 	Addr    string
-	Timeout int64 // millisecond
 }
 
 type Server struct {
 	option *Option
-	queue  chan *task
+	queue  chan *Task
 	stop   chan struct{}
 }
 
-type task struct {
+type Task struct {
 	req *token.Token
 	rsp chan *token.Token
 }
 
 func NewServer(option *Option) *Server {
-
 	if option.Proto == "" {
 		option.Proto = "tcp"
 	}
@@ -44,7 +42,7 @@ func (s *Server) Serve() error {
 	if err != nil {
 		return err
 	}
-	s.queue = make(chan *task)
+	s.queue = make(chan *Task)
 	s.stop = make(chan struct{})
 
 	go func() {
@@ -75,14 +73,14 @@ func (s *Server) Serve() error {
 					}
 					glog.Error(err)
 				}
-				glog.Infof("request token: %+v", req)
+				glog.Infof("request: %v", req.Format())
 				c := make(chan *token.Token)
-				s.queue <- &task{req, c}
+				s.queue <- &Task{req, c}
 				reply := <-c
-				rsp, err := token.Serialize(reply)
+				rsp, err := reply.Serialize()
 				if err != nil {
 					glog.Error(err)
-					errRsp, _ := token.Serialize(token.ErrorDefault)
+					errRsp, _ := token.ErrorDefault.Serialize()
 					_, err = conn.Write(errRsp)
 				} else {
 					_, err = conn.Write(rsp)
