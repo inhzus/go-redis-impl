@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bufio"
 	"net"
 
 	"github.com/golang/glog"
@@ -27,7 +26,7 @@ func NewClient(option *Option) *Client {
 	} else if option.Addr == "" {
 		option.Addr = ":6389"
 	}
-	return &Client{option: option,}
+	return &Client{option: option}
 }
 
 func (c *Client) Connect() (err error) {
@@ -42,7 +41,7 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) Request(argument *token.Argument) {
+func (c *Client) Request(t *token.Token) {
 	if c.conn == nil {
 		if err := c.Connect(); err != nil {
 			glog.Error(err)
@@ -50,12 +49,12 @@ func (c *Client) Request(argument *token.Argument) {
 		}
 		defer func() { _ = c.Close() }()
 	}
-	data, err := token.Serialize(argument)
+	data, err := token.Serialize(t)
 	if err != nil {
 		glog.Error(err)
 		return
 	}
 	_, _ = c.conn.Write(data)
-	rsp, _ := bufio.NewReader(c.conn).ReadBytes('\n')
-	glog.Infof("response: %v", rsp)
+	rsp, _ := token.Deserialize(c.conn)
+	glog.Infof("response t: %+v", rsp)
 }

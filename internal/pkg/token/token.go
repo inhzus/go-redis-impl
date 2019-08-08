@@ -3,12 +3,9 @@ package token
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -23,31 +20,32 @@ var (
 	ProtocolSeps       = []byte("\r\n")
 	NilData            = []byte("-1\r\n")
 	NilBulkedLen int64 = -1
+	ErrorDefault       = NewError("error")
 )
 
-type Argument struct {
-	label byte
-	data  interface{}
+type Token struct {
+	Label byte
+	Data  interface{}
 }
 
-func NewString(s string) *Argument {
-	return &Argument{LabelString, s}
+func NewString(s string) *Token {
+	return &Token{LabelString, s}
 }
 
-func NewError(s string) *Argument {
-	return &Argument{LabelError, s}
+func NewError(s string) *Token {
+	return &Token{LabelError, s}
 }
 
-func NewInteger(num int64) *Argument {
-	return &Argument{LabelInteger, num}
+func NewInteger(num int64) *Token {
+	return &Token{LabelInteger, num}
 }
 
-func NewBulked(data []byte) *Argument {
-	return &Argument{LabelBulked, data}
+func NewBulked(data []byte) *Token {
+	return &Token{LabelBulked, data}
 }
 
-func NewArray(arguments []*Argument) *Argument {
-	return &Argument{LabelArray, arguments}
+func NewArray(tokens ...*Token) *Token {
+	return &Token{LabelArray, tokens}
 }
 
 func readUntil(reader *bufio.Reader, seps []byte) (line []byte, err error) {
@@ -63,82 +61,80 @@ func readUntil(reader *bufio.Reader, seps []byte) (line []byte, err error) {
 	}
 }
 
-func parseItem(reader *bufio.Reader) (*Argument, error) {
+func parseItem(reader *bufio.Reader) (*Token, error) {
 	row, err := readUntil(reader, ProtocolSeps)
 	if err != nil {
 		return nil, err
 	}
 	if len(row) < 1 {
-		return nil, errors.New("row empty")
+		return nil, fmt.Errorf("row empty")
 	}
 	label := row[0]
 	row = row[1:]
 	switch label {
 	case LabelString, LabelError:
-		return &Argument{label: label, data: string(row),}, nil
+		return &Token{Label: label, Data: string(row)}, nil
 	case LabelInteger:
 		num, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		return &Argument{label: LabelInteger, data: num,}, nil
+		return &Token{Label: LabelInteger, Data: num}, nil
 	case LabelBulked:
 		n, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		if n == NilBulkedLen {
-			return &Argument{label: LabelBulked, data: nil}, nil
+			return &Token{Label: LabelBulked, Data: nil}, nil
 		}
 		data := make([]byte, n)
 		if _, err = reader.Read(data); err != nil {
 			return nil, err
 		}
-		return &Argument{label: LabelBulked, data: data,}, nil
+		return &Token{Label: LabelBulked, Data: data}, nil
 	case LabelArray:
 		n, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		var i int64 = 0
-		var arguments []*Argument
+		var tokens []*Token
 		for ; i < n; i++ {
-			argument, err := parseItem(reader)
+			token, err := parseItem(reader)
 			if err != nil {
 				return nil, err
 			}
-			arguments = append(arguments, argument)
+			tokens = append(tokens, token)
 		}
-		return &Argument{label: LabelArray, data: arguments,}, nil
+		return &Token{Label: LabelArray, Data: tokens}, nil
 	}
 	return nil, nil
 }
 
-func Deserialize(conn net.Conn) (*Argument, error) {
+func Deserialize(conn net.Conn) (*Token, error) {
 	reader := bufio.NewReader(conn)
-	argument, err := parseItem(reader)
+	token, err := parseItem(reader)
 	if err != nil {
-		glog.Errorf("parse read: %v", err)
 		return nil, err
 	}
-	glog.Infof("request token: %+v", argument)
-	return argument, nil
+	return token, nil
 }
 
-func Serialize(argument *Argument) ([]byte, error) {
-	const ErrorMsg = "cast token data to %v error, data: %v"
-	if argument == nil {
+func Serialize(token *Token) ([]byte, error) {
+	const ErrorMsg = "cast token Data to %v error, Data: %v"
+	if token == nil {
 		data := []byte{LabelBulked}
 		data = append(data, NilData...)
 		return data, nil
 	}
-	data := []byte{argument.label}
-	src := argument.data
-	switch argument.label {
+	data := []byte{token.Label}
+	src := token.Data
+	switch token.Label {
 	case LabelArray:
-		array, ok := src.([]*Argument)
+		array, ok := src.([]*Token)
 		if !ok {
-			return nil, errors.New(fmt.Sprintf(ErrorMsg, "array", src))
+			return nil, fmt.Errorf(ErrorMsg, "array", src)
 		}
 		data = append(data, strconv.FormatInt(int64(len(array)), 10)...)
 		data = append(data, ProtocolSeps...)
@@ -154,19 +150,19 @@ func Serialize(argument *Argument) ([]byte, error) {
 			data = append(data, s...)
 			data = append(data, ProtocolSeps...)
 		} else {
-			return nil, errors.New(fmt.Sprintf(ErrorMsg, "string", src))
+			return nil, fmt.Errorf(ErrorMsg, "string", src)
 		}
 	case LabelInteger:
 		if num, ok := src.(int64); ok {
 			data = append(data, strconv.FormatInt(num, 10)...)
 			data = append(data, ProtocolSeps...)
 		} else {
-			return nil, errors.New(fmt.Sprintf(ErrorMsg, "integer", src))
+			return nil, fmt.Errorf(ErrorMsg, "integer", src)
 		}
 	case LabelBulked:
 		val, ok := src.([]byte)
 		if !ok {
-			return nil, errors.New(fmt.Sprintf(ErrorMsg, "bulked string", src))
+			return nil, fmt.Errorf(ErrorMsg, "bulked string", src)
 		}
 		data = append(data, strconv.FormatInt(int64(len(val)), 10)...)
 		data = append(data, ProtocolSeps...)
