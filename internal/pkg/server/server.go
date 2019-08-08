@@ -16,13 +16,8 @@ type Option struct {
 
 type Server struct {
 	option *Option
-	queue  chan *Task
+	queue  chan *token.Task
 	stop   chan struct{}
-}
-
-type Task struct {
-	req *token.Token
-	rsp chan *token.Token
 }
 
 func NewServer(option *Option) *Server {
@@ -42,7 +37,7 @@ func (s *Server) Serve() error {
 	if err != nil {
 		return err
 	}
-	s.queue = make(chan *Task)
+	s.queue = make(chan *token.Task)
 	s.stop = make(chan struct{})
 
 	go func() {
@@ -54,7 +49,7 @@ func (s *Server) Serve() error {
 				s.stop <- struct{}{}
 				return
 			case t := <-s.queue:
-				t.rsp <- command.Process(t.req)
+				t.Rsp <- command.Process(t.Req)
 			}
 		}
 	}()
@@ -75,7 +70,7 @@ func (s *Server) Serve() error {
 				}
 				glog.Infof("request: %v", req.Format())
 				c := make(chan *token.Token)
-				s.queue <- &Task{req, c}
+				s.queue <- &token.Task{Req: req, Rsp: c}
 				reply := <-c
 				rsp, err := reply.Serialize()
 				if err != nil {

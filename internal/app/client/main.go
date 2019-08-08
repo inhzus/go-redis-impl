@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
+	"strconv"
+	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/client"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
-	"fmt"
 )
 
 func init() {
@@ -16,19 +17,30 @@ func init() {
 }
 
 func main() {
-	cli := client.NewClient(&client.Option{})
-	err := cli.Connect()
-	if err != nil {
-		glog.Error(err)
-		return
+	wg := &sync.WaitGroup{}
+	startTime := time.Now()
+	for i := 0; i < 250; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cli := client.NewClient(&client.Option{})
+			_ = cli.Connect()
+			for j := 0; j < 100; j++ {
+				rsp := cli.Request(token.NewArray(
+					token.NewString("set"), token.NewString("a"),
+					token.NewBulked([]byte(strconv.FormatInt(int64(i*j), 10)))))
+				if rsp.Label == token.LabelError {
+					glog.Errorf("error")
+				}
+				rsp = cli.Request(token.NewArray(
+					token.NewString("get"), token.NewString("a")))
+				if rsp.Label == token.LabelError {
+					glog.Errorf("error")
+				}
+			}
+			cli.Close()
+		}()
 	}
-	_, _ = cli.Request(token.NewString(command.StringPing))
-	_, _ = cli.Request(token.NewArray(
-		token.NewString("set"), token.NewString("a"), token.NewBulked([]byte("what"))))
-	_, _ = cli.Request(token.NewArray(
-		token.NewString("get"), token.NewString("a")))
-	_ = cli.Close()
-	x := fmt.Sprintf("%v%v%v", 1, "%v", 3)
-	fmt.Printf(x)
-	//fmt.Printf(fmt.Sprintf("%v%v%v", 1, "%v", 3), 2)
+	wg.Wait()
+	glog.Infof("time: %v", time.Now().Sub(startTime))
 }

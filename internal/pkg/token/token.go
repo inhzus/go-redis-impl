@@ -25,6 +25,11 @@ var (
 	ReplyOk            = NewString("ok")
 )
 
+type Task struct {
+	Req *Token
+	Rsp chan *Token
+}
+
 type Token struct {
 	Label byte
 	Data  interface{}
