@@ -4,6 +4,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/command"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
@@ -62,7 +63,7 @@ func (c *Client) Connect() (err error) {
 			case t := <-c.queue:
 				t.Rsp <- c.process(t.Req)
 			case <-time.After(time.Second * 1):
-				c.process(token.NewString(command.StringPing))
+				c.process(token.NewString(command.CmdPing))
 			}
 		}
 	}()
@@ -87,5 +88,6 @@ func (c *Client) Request(t *token.Token) *token.Token {
 	ch := make(chan *token.Token)
 	c.queue <- &token.Task{Req: t, Rsp: ch}
 	rsp := <-ch
+	glog.Infof("response: %v", rsp.Format())
 	return rsp
 }

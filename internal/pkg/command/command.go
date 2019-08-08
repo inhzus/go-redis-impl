@@ -8,22 +8,14 @@ import (
 )
 
 const (
-	StringPing = "ping"
-	StringPong = "pong"
 	CmdGet     = "get"
 	CmdSet     = "set"
+	CmdPing    = "ping"
+	StringPong = "pong"
 )
 
-func ping() *token.Token {
+func ping(_ []*token.Token) *token.Token {
 	return token.NewString(StringPong)
-}
-
-func processString(s string) *token.Token {
-	switch s {
-	case StringPing:
-		return ping()
-	}
-	return token.ErrorDefault
 }
 
 func set(tokens []*token.Token) *token.Token {
@@ -52,30 +44,30 @@ func get(tokens []*token.Token) *token.Token {
 	return &token.Token{Label: token.LabelBulked, Data: model.Data.Get(key.Data.(string))}
 }
 
-func processArray(tokens []*token.Token) *token.Token {
-	if len(tokens) < 1 {
-		return token.ErrorDefault
-	}
-	cmd := tokens[0]
-	tokens = tokens[1:]
-	if cmd.Label != token.LabelString {
-		return token.ErrorDefault
-	}
+func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
 	switch cmd.Data.(string) {
-	case CmdSet:
-		return set(tokens)
 	case CmdGet:
-		return get(tokens)
+		return get(args)
+	case CmdSet:
+		return set(args)
+	case CmdPing:
+		return ping(args)
 	}
 	return token.ErrorDefault
 }
 
-func Process(argument *token.Token) *token.Token {
-	switch argument.Label {
-	case token.LabelString:
-		return processString(argument.Data.(string))
-	case token.LabelArray:
-		return processArray(argument.Data.([]*token.Token))
+func Process(req *token.Token) *token.Token {
+	data := req.Data.([]*token.Token)
+	if len(data) == 0 {
+		return token.ErrorDefault
 	}
-	return token.ErrorDefault
+	cmd := data[0]
+	if cmd.Label == token.LabelString {
+		return processCommand(cmd, data[1:])
+	}
+	var rspData []*token.Token
+	for _, item := range data {
+		rspData = append(rspData, Process(item))
+	}
+	return token.NewArray(rspData...)
 }

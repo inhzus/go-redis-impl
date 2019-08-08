@@ -130,7 +130,7 @@ func Deserialize(conn net.Conn) (*Token, error) {
 
 func (t *Token) Serialize() ([]byte, error) {
 	const ErrorMsg = "cast t Data to %v error, Data: %v"
-	if t == nil {
+	if t == nil || t.Data == nil {
 		data := []byte{LabelBulked}
 		data = append(data, NilData...)
 		return data, nil
