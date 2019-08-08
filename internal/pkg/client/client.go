@@ -50,12 +50,12 @@ func (c *Client) Request(argument *token.Argument) {
 		}
 		defer func() { _ = c.Close() }()
 	}
-	data, err := token.Compose(argument)
+	data, err := token.Serialize(argument)
 	if err != nil {
 		glog.Error(err)
 		return
 	}
 	_, _ = c.conn.Write(data)
 	rsp, _ := bufio.NewReader(c.conn).ReadBytes('\n')
-	glog.Infof("response: %v", string(rsp))
+	glog.Infof("response: %v", rsp)
 }

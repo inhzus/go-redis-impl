@@ -7,38 +7,67 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
+type Option struct {
+	Proto   string
+	Addr    string
+	Timeout int64 // millisecond
+}
+
 type Server struct {
-	Proto    string
-	Addr     string
-	Channels []chan string
+	option *Option
+	queue  chan net.Conn
+	stop   chan struct{}
+}
+
+func NewServer(option *Option) *Server {
+
+	if option.Proto == "" {
+		option.Proto = "tcp"
+	}
+	if option.Proto == "unix" && option.Addr == "" {
+		option.Addr = "/tmp/redis.sock"
+	} else if option.Addr == "" {
+		option.Addr = ":6389"
+	}
+	return &Server{option: option,}
 }
 
 func (s *Server) Serve() error {
-	addr := s.Addr
-	if s.Proto == "" {
-		s.Proto = "tcp"
-	}
-	if s.Proto == "unix" && addr == "" {
-		addr = "/tmp/redis.sock"
-	} else if addr == "" {
-		addr = ":6389"
-	}
-	listener, err := net.Listen(s.Proto, addr)
+	listener, err := net.Listen(s.option.Proto, s.option.Addr)
 	if err != nil {
 		return err
 	}
-	s.Channels = []chan string{}
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			return err
-		}
-		go func(conn net.Conn) {
-			_, err = token.Parse(conn)
-			if err != nil {
-				glog.Errorf("parse: %v", err)
+	s.queue = make(chan net.Conn)
+	s.stop = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-s.stop:
+				glog.Infof("server consumer stop")
+				break
+			case conn := <-s.queue:
+				_, err := token.Deserialize(conn)
+				if err != nil {
+					glog.Error(err)
+				}
+
+				//_ = conn.Close()
 			}
-			_ = conn.Close()
-		}(conn)
+		}
+	}()
+
+	for {
+		select {
+		case <-s.stop:
+			glog.Infof("server producer stop")
+			return listener.Close()
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				return err
+			}
+			s.queue <- conn
+		}
 	}
 }

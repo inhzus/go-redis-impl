@@ -114,18 +114,18 @@ func parseItem(reader *bufio.Reader) (*Argument, error) {
 	return nil, nil
 }
 
-func Parse(conn net.Conn) ([]Argument, error) {
+func Deserialize(conn net.Conn) (*Argument, error) {
 	reader := bufio.NewReader(conn)
 	argument, err := parseItem(reader)
 	if err != nil {
 		glog.Errorf("parse read: %v", err)
 		return nil, err
 	}
-	glog.Infof("request row: %+v", argument)
-	return nil, nil
+	glog.Infof("request token: %+v", argument)
+	return argument, nil
 }
 
-func Compose(argument *Argument) ([]byte, error) {
+func Serialize(argument *Argument) ([]byte, error) {
 	const ErrorMsg = "cast token data to %v error, data: %v"
 	if argument == nil {
 		data := []byte{LabelBulked}
@@ -143,7 +143,7 @@ func Compose(argument *Argument) ([]byte, error) {
 		data = append(data, strconv.FormatInt(int64(len(array)), 10)...)
 		data = append(data, ProtocolSeps...)
 		for _, arg := range array {
-			item, err := Compose(arg)
+			item, err := Serialize(arg)
 			if err != nil {
 				return nil, err
 			}
