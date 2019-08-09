@@ -57,6 +57,9 @@ func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
 }
 
 func Process(req *token.Token) *token.Token {
+	if req == nil {
+		return token.ErrorDefault
+	}
 	data := req.Data.([]*token.Token)
 	if len(data) == 0 {
 		return token.ErrorDefault

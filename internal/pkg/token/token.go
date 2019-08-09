@@ -25,9 +25,14 @@ var (
 	ReplyOk            = NewString("ok")
 )
 
+type Response struct {
+	Data *Token
+	Err  error
+}
+
 type Task struct {
 	Req *Token
-	Rsp chan *Token
+	Rsp chan *Response
 }
 
 type Token struct {
@@ -184,4 +189,15 @@ func (t *Token) Format() (s string) {
 		return strings.ReplaceAll(string(row), "\r\n", " ")
 	}
 	return
+}
+
+func (t *Token) Error() error {
+	if t.Label == LabelError {
+		return fmt.Errorf(t.Data.(string))
+	}
+	return nil
+}
+
+func (t *Token) Value() interface{} {
+	return t.Data
 }

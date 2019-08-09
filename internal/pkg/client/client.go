@@ -15,10 +15,11 @@ type Option struct {
 }
 
 type Client struct {
-	option *Option
-	conn   net.Conn
-	queue  chan *token.Task
-	stop   chan struct{}
+	option  *Option
+	conn    net.Conn
+	queue   chan *token.Task
+	stop    chan struct{}
+	request func(*token.Token) (*token.Token, error)
 }
 
 func NewClient(option *Option) *Client {
@@ -30,20 +31,22 @@ func NewClient(option *Option) *Client {
 	} else if option.Addr == "" {
 		option.Addr = ":6389"
 	}
-	return &Client{option: option}
+	c := &Client{option: option}
+	c.request = c.req
+	return c
 }
 
-func (c *Client) process(t *token.Token) *token.Token {
+func (c *Client) consume(t *token.Token) (*token.Token, error) {
 	data, err := t.Serialize()
 	if err != nil {
-		return token.NewError("client cannot serialize token")
+		return nil, err
 	}
 	_, err = c.conn.Write(data)
 	if err != nil {
-		return token.NewError("connection cannot be write")
+		return nil, err
 	}
 	rsp, _ := token.Deserialize(c.conn)
-	return rsp
+	return rsp, err
 }
 
 func (c *Client) Connect() (err error) {
@@ -61,9 +64,10 @@ func (c *Client) Connect() (err error) {
 				c.stop <- struct{}{}
 				return
 			case t := <-c.queue:
-				t.Rsp <- c.process(t.Req)
+				d, err := c.consume(t.Req)
+				t.Rsp <- &token.Response{Data: d, Err: err}
 			case <-time.After(time.Second * 1):
-				c.process(token.NewString(command.CmdPing))
+				_, _ = c.consume(token.NewString(command.CmdPing))
 			}
 		}
 	}()
@@ -78,16 +82,27 @@ func (c *Client) Close() {
 	}
 }
 
-func (c *Client) Request(t *token.Token) *token.Token {
+func (c *Client) submit(t *token.Token) (*token.Token, error) {
 	if c.conn == nil {
-		if err := c.Connect(); err != nil {
-			return nil
-		}
 		defer c.Close()
+		if err := c.Connect(); err != nil {
+			return nil, err
+		}
 	}
-	ch := make(chan *token.Token)
+	ch := make(chan *token.Response)
 	c.queue <- &token.Task{Req: t, Rsp: ch}
 	rsp := <-ch
-	glog.Infof("response: %v", rsp.Format())
-	return rsp
+	glog.Infof("response: %v", rsp.Data.Format())
+	return rsp.Data, rsp.Err
+}
+
+func (c *Client) req(t *token.Token) (*token.Token, error) {
+	return c.submit(t)
+}
+
+func (c *Client) Pipeline() *Pipeline {
+	p := &Pipeline{Client: c}
+	p.request = p.req
+	p.Client.request = p.req
+	return p
 }

@@ -49,7 +49,7 @@ func (s *Server) Serve() error {
 				s.stop <- struct{}{}
 				return
 			case t := <-s.queue:
-				t.Rsp <- command.Process(t.Req)
+				t.Rsp <- &token.Response{Data: command.Process(t.Req)}
 			}
 		}
 	}()
@@ -69,10 +69,10 @@ func (s *Server) Serve() error {
 					glog.Error(err)
 				}
 				glog.Infof("request: %v", req.Format())
-				c := make(chan *token.Token)
+				c := make(chan *token.Response)
 				s.queue <- &token.Task{Req: req, Rsp: c}
 				reply := <-c
-				rsp, err := reply.Serialize()
+				rsp, err := reply.Data.Serialize()
 				if err != nil {
 					glog.Error(err)
 					errRsp, _ := token.ErrorDefault.Serialize()
