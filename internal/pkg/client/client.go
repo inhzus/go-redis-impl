@@ -2,10 +2,8 @@ package client
 
 import (
 	"net"
-	"time"
 
 	"github.com/golang/glog"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -46,6 +44,7 @@ func (c *Client) consume(t *token.Token) (*token.Token, error) {
 		return nil, err
 	}
 	rsp, _ := token.Deserialize(c.conn)
+	glog.Infof("response: %v", rsp.Format())
 	return rsp, err
 }
 
@@ -66,8 +65,11 @@ func (c *Client) Connect() (err error) {
 			case t := <-c.queue:
 				d, err := c.consume(t.Req)
 				t.Rsp <- &token.Response{Data: d, Err: err}
-			case <-time.After(time.Second * 1):
-				_, _ = c.consume(token.NewString(command.CmdPing))
+			//case <-time.After(time.Second * 15):
+			//	_, err = c.consume(token.NewArray(token.NewString(command.CmdPing)))
+			//	if err != nil {
+			//		glog.Errorf("failed to keep connection: %v", err)
+			//	}
 			}
 		}
 	}()
@@ -82,7 +84,7 @@ func (c *Client) Close() {
 	}
 }
 
-func (c *Client) submit(t *token.Token) (*token.Token, error) {
+func (c *Client) Submit(t *token.Token) (*token.Token, error) {
 	if c.conn == nil {
 		defer c.Close()
 		if err := c.Connect(); err != nil {
@@ -92,12 +94,11 @@ func (c *Client) submit(t *token.Token) (*token.Token, error) {
 	ch := make(chan *token.Response)
 	c.queue <- &token.Task{Req: t, Rsp: ch}
 	rsp := <-ch
-	glog.Infof("response: %v", rsp.Data.Format())
 	return rsp.Data, rsp.Err
 }
 
 func (c *Client) req(t *token.Token) (*token.Token, error) {
-	return c.submit(t)
+	return c.Submit(t)
 }
 
 func (c *Client) Pipeline() *Pipeline {

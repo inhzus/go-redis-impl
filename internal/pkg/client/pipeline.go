@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 
+	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -26,14 +27,14 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 			return nil, fmt.Errorf("connection nil")
 		}
 	}
-	ins, err := p.Client.submit(token.NewArray(p.commands...))
+	ins, err := p.Client.Submit(token.NewArray(p.commands...))
 	if err != nil {
 		return nil, err
 	}
-	if ins.Label == token.LabelError {
+	if ins.Label == label.Error {
 		return nil, fmt.Errorf(ins.Data.(string))
 	}
-	if ins.Label != token.LabelArray {
+	if ins.Label != label.Array {
 		return nil, fmt.Errorf("pipeline response label not expected: %v", ins.Label)
 	}
 	data := ins.Data.([]*token.Token)

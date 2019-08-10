@@ -1,57 +1,90 @@
 package command
 
 import (
-	"time"
-
+	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
 const (
-	CmdGet     = "get"
-	CmdSet     = "set"
-	CmdPing    = "ping"
-	StringPong = "pong"
+	CmdGet  = "get"
+	CmdIncr = "incr"
+	CmdSet  = "set"
+	CmdPing = "ping"
 )
 
-func ping(_ []*token.Token) *token.Token {
-	return token.NewString(StringPong)
+const (
+	strPong = "pong"
+)
+
+const (
+	eStrMismatch = "type of %v is %v instead of %v"
+	eStrArgMore  = "not enough arguments"
+)
+
+func ping(_ ...*token.Token) *token.Token {
+	return token.NewString(strPong)
 }
 
-func set(tokens []*token.Token) *token.Token {
+func set(tokens ...*token.Token) *token.Token {
 	if len(tokens) < 2 {
-		return token.ErrorDefault
+		return token.NewError(eStrArgMore)
 	}
 	key, value := tokens[0], tokens[1]
-	if key.Label != token.LabelString {
-		return token.ErrorDefault
+	if et := checkKeyType(key); et != nil {
+		return token.NewError(et.Error())
 	}
-	if value.Label != token.LabelBulked {
-		return token.ErrorDefault
+	if et := checkType(value, "value", label.Bulked, label.Integer, label.String);
+		et != nil {
+		return token.NewError(et.Error())
 	}
-	model.Data.Set(key.Data.(string), value.Data, time.Now().Add(time.Minute))
+	model.Set(key.Data.(string), value.Data, nil)
 	return token.ReplyOk
 }
 
-func get(tokens []*token.Token) *token.Token {
+func get(tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
-		return token.ErrorDefault
+		return token.NewError(eStrArgMore)
 	}
 	key := tokens[0]
-	if key.Label != token.LabelString {
-		return token.ErrorDefault
+	if et := checkKeyType(key); et != nil {
+		return token.NewError(et.Error())
 	}
-	return &token.Token{Label: token.LabelBulked, Data: model.Data.Get(key.Data.(string))}
+	val := model.Get(key.Data.(string))
+	if data, err := ItfToBulked(val); err != nil {
+		return token.NewError(err.Error())
+	} else {
+		return token.NewBulked(data)
+	}
+}
+
+func incr(tokens ...*token.Token) *token.Token {
+	rsp := get(tokens...)
+	if rsp.Label == label.Error {
+		return rsp
+	}
+	num, err := ItfToInt(rsp.Data)
+	if err != nil {
+		return token.NewError(err.Error())
+	}
+	if num == nil {
+		set(tokens[0], token.NewInteger(1))
+	} else {
+		set(tokens[0], token.NewInteger(num.(int64)+1))
+	}
+	return token.ReplyOk
 }
 
 func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
 	switch cmd.Data.(string) {
 	case CmdGet:
-		return get(args)
+		return get(args...)
 	case CmdSet:
-		return set(args)
+		return set(args...)
 	case CmdPing:
-		return ping(args)
+		return ping(args...)
+	case CmdIncr:
+		return incr(args...)
 	}
 	return token.ErrorDefault
 }
@@ -65,7 +98,7 @@ func Process(req *token.Token) *token.Token {
 		return token.ErrorDefault
 	}
 	cmd := data[0]
-	if cmd.Label == token.LabelString {
+	if cmd.Label == label.String {
 		return processCommand(cmd, data[1:])
 	}
 	var rspData []*token.Token

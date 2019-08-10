@@ -6,23 +6,28 @@ import (
 
 type Item struct {
 	row    interface{}
-	expire time.Time
+	expire *time.Time
 }
 
 type DataStorage struct {
-	data map[string]Item
+	data map[string]*Item
 }
 
 func NewData() *DataStorage {
-	return &DataStorage{make(map[string]Item)}
+	return &DataStorage{make(map[string]*Item)}
 }
 
 func (d *DataStorage) Get(key string) interface{} {
-	return d.data[key].row
+	r, ok := d.data[key]
+	if ok {
+		return r.row
+	} else {
+		return nil
+	}
 }
 
-func (d *DataStorage) Set(key string, value interface{}, expire time.Time) interface{} {
-	item := Item{row: value, expire: expire,}
+func (d *DataStorage) Set(key string, value interface{}, expire *time.Time) interface{} {
+	item := &Item{row: value, expire: expire,}
 	d.data[key] = item
 	return item.row
 }
@@ -30,3 +35,11 @@ func (d *DataStorage) Set(key string, value interface{}, expire time.Time) inter
 var (
 	Data = NewData()
 )
+
+func Get(key string) interface{} {
+	return Data.Get(key)
+}
+
+func Set(key string, value interface{}, expire *time.Time) interface{} {
+	return Data.Set(key, value, expire)
+}

@@ -60,10 +60,12 @@ func (s *Server) Serve() error {
 			return err
 		}
 		go func(conn net.Conn) {
+			glog.Infof("client %v connection established", conn.RemoteAddr())
 			for {
 				req, err := token.Deserialize(conn)
 				if err != nil {
 					if err == io.EOF {
+						glog.Errorf("client %v connection closed", conn.RemoteAddr())
 						return
 					}
 					glog.Error(err)
@@ -75,11 +77,9 @@ func (s *Server) Serve() error {
 				rsp, err := reply.Data.Serialize()
 				if err != nil {
 					glog.Error(err)
-					errRsp, _ := token.ErrorDefault.Serialize()
-					_, err = conn.Write(errRsp)
-				} else {
-					_, err = conn.Write(rsp)
+					rsp, _ = token.ErrorDefault.Serialize()
 				}
+				_, err = conn.Write(rsp)
 				if err != nil {
 					glog.Error(err)
 				}
