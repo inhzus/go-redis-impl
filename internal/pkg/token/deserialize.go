@@ -50,11 +50,11 @@ func parseItem(reader *bufio.Reader) (*Token, error) {
 		if n == NilBulkedLen {
 			return &Token{Label: sign, Data: nil}, nil
 		}
-		data := make([]byte, n)
+		data := make([]byte, n+2)
 		if _, err = reader.Read(data); err != nil {
 			return nil, err
 		}
-		return &Token{Label: sign, Data: data}, nil
+		return &Token{Label: sign, Data: data[:len(data)-2]}, nil
 	case label.Array:
 		n, err := strconv.ParseInt(string(row), 10, 64)
 		if err != nil {
