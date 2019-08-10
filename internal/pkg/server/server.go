@@ -62,27 +62,29 @@ func (s *Server) Serve() error {
 		go func(conn net.Conn) {
 			glog.Infof("client %v connection established", conn.RemoteAddr())
 			for {
-				req, err := token.Deserialize(conn)
-				if err != nil {
-					if err == io.EOF {
-						glog.Errorf("client %v connection closed", conn.RemoteAddr())
+				req := token.Deserialize(conn)
+				if req.Err != nil {
+					if req.Err == io.EOF {
+						glog.Infof("client %v connection closed", conn.RemoteAddr())
 						return
 					}
 					glog.Error(err)
 				}
-				glog.Infof("request: %v", req.Format())
+				glog.Infof("request: %v", req.Data.Format())
 				c := make(chan *token.Response)
-				s.queue <- &token.Task{Req: req, Rsp: c}
+				s.queue <- &token.Task{Req: req.Data, Rsp: c}
 				reply := <-c
 				rsp, err := reply.Data.Serialize()
 				if err != nil {
 					glog.Error(err)
 					rsp, _ = token.ErrorDefault.Serialize()
 				}
-				_, err = conn.Write(rsp)
-				if err != nil {
-					glog.Error(err)
-				}
+				go func(r []byte) {
+					_, err = conn.Write(r)
+					if err != nil {
+						glog.Error(err)
+					}
+				}(rsp)
 			}
 		}(conn)
 	}

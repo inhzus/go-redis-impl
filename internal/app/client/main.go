@@ -15,7 +15,9 @@ func init() {
 
 func main() {
 	startTime := time.Now()
-	cli := client.NewClient(&client.Option{})
+	cli := client.NewClient(&client.Option{
+		ReadTimeout:  time.Millisecond / 2,
+		WriteTimeout: time.Millisecond / 2})
 	_ = cli.Connect()
 
 	cli.Set("c", 2)
