@@ -12,9 +12,9 @@ type Pipeline struct {
 	commands []*token.Token
 }
 
-func (p *Pipeline) req(t *token.Token) (*token.Token, error) {
+func (p *Pipeline) req(t *token.Token) *token.Response {
 	p.commands = append(p.commands, t)
-	return t, nil
+	return &token.Response{Data: t}
 }
 
 func (p *Pipeline) Exec() ([]*token.Token, error) {
@@ -27,17 +27,17 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 			return nil, fmt.Errorf("connection nil")
 		}
 	}
-	ins, err := p.Client.Submit(token.NewArray(p.commands...))
-	if err != nil {
-		return nil, err
+	rsp := p.Client.Submit(token.NewArray(p.commands...))
+	if rsp.Err != nil {
+		return nil, rsp.Err
 	}
-	if ins.Label == label.Error {
-		return nil, fmt.Errorf(ins.Data.(string))
+	if rsp.Data.Label == label.Error {
+		return nil, fmt.Errorf(rsp.Data.Data.(string))
 	}
-	if ins.Label != label.Array {
-		return nil, fmt.Errorf("pipeline response label not expected: %v", ins.Label)
+	if rsp.Data.Label != label.Array {
+		return nil, fmt.Errorf("pipeline response label not expected: %v", rsp.Data.Label)
 	}
-	data := ins.Data.([]*token.Token)
+	data := rsp.Data.Data.([]*token.Token)
 	if len(data) != len(p.commands) {
 		return nil, fmt.Errorf("pipeline response sequences not equal to request")
 	}

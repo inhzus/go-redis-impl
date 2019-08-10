@@ -17,7 +17,7 @@ type Client struct {
 	conn    net.Conn
 	queue   chan *token.Task
 	stop    chan struct{}
-	request func(*token.Token) (*token.Token, error)
+	request func(*token.Token) *token.Response
 }
 
 func NewClient(option *Option) *Client {
@@ -84,20 +84,20 @@ func (c *Client) Close() {
 	}
 }
 
-func (c *Client) Submit(t *token.Token) (*token.Token, error) {
+func (c *Client) Submit(t *token.Token) *token.Response {
 	if c.conn == nil {
 		defer c.Close()
 		if err := c.Connect(); err != nil {
-			return nil, err
+			return &token.Response{Err: err}
 		}
 	}
 	ch := make(chan *token.Response)
 	c.queue <- &token.Task{Req: t, Rsp: ch}
 	rsp := <-ch
-	return rsp.Data, rsp.Err
+	return rsp
 }
 
-func (c *Client) req(t *token.Token) (*token.Token, error) {
+func (c *Client) req(t *token.Token) *token.Response {
 	return c.Submit(t)
 }
 

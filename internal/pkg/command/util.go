@@ -34,6 +34,9 @@ func ItfToBulked(v interface{}) (interface{}, error) {
 	switch v.(type) {
 	case []byte:
 		data = v.([]byte)
+	case int:
+		num := v.(int)
+		data = []byte(strconv.FormatInt(int64(num), 10))
 	case int64:
 		num := v.(int64)
 		data = []byte(strconv.FormatInt(num, 10))

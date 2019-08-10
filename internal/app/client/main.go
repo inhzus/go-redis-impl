@@ -6,8 +6,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/client"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
-	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
 func init() {
@@ -20,11 +18,9 @@ func main() {
 	cli := client.NewClient(&client.Option{})
 	_ = cli.Connect()
 
-	cli.Submit(token.NewArray(
-		token.NewString(command.CmdIncr), token.NewString("c")))
-	cli.Submit(token.NewArray(
-		token.NewString(command.CmdIncr), token.NewString("c")))
-	_, _ = cli.Get("c")
+	cli.Set("c", 2)
+	cli.Incr("c")
+	cli.Get("c")
 
 	glog.Infof("time: %v", time.Now().Sub(startTime))
 }
