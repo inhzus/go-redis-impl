@@ -19,3 +19,8 @@ func (c *Client) Ping() (*token.Token, error) {
 	row := token.NewArray(token.NewString(command.CmdPing))
 	return c.request(row)
 }
+
+func (c *Client) Incr(key string) (*token.Token, error) {
+	row := token.NewArray(token.NewString(command.CmdIncr), token.NewString(key))
+	return c.request(row)
+}

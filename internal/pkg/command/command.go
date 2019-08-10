@@ -67,12 +67,13 @@ func incr(tokens ...*token.Token) *token.Token {
 	if err != nil {
 		return token.NewError(err.Error())
 	}
-	if num == nil {
-		set(tokens[0], token.NewInteger(1))
-	} else {
-		set(tokens[0], token.NewInteger(num.(int64)+1))
+	var val int64 = 1
+	if num != nil {
+		val = num.(int64) + 1
 	}
-	return token.ReplyOk
+	rsp = token.NewInteger(val)
+	set(tokens[0], rsp)
+	return rsp
 }
 
 func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
