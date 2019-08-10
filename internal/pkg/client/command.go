@@ -28,3 +28,8 @@ func (c *Client) Incr(key string) *token.Response {
 	row := token.NewArray(token.NewString(command.CmdIncr), token.NewString(key))
 	return c.request(row)
 }
+
+func (c *Client) Desc(key string) *token.Response {
+	row := token.NewArray(token.NewString(command.CmdDesc), token.NewString(key))
+	return c.request(row)
+}

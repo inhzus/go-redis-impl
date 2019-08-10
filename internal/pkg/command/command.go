@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	CmdDesc = "desc"
 	CmdGet  = "get"
 	CmdIncr = "incr"
 	CmdSet  = "set"
@@ -31,12 +32,12 @@ func set(tokens ...*token.Token) *token.Token {
 		return token.NewError(eStrArgMore)
 	}
 	key, value := tokens[0], tokens[1]
-	if et := checkKeyType(key); et != nil {
-		return token.NewError(et.Error())
+	if err := checkKeyType(key); err != nil {
+		return token.NewError(err.Error())
 	}
-	if et := checkType(value, "value", label.Bulked, label.Integer, label.String);
-		et != nil {
-		return token.NewError(et.Error())
+	if err := checkType(value, "value", label.Bulked, label.Integer, label.String);
+		err != nil {
+		return token.NewError(err.Error())
 	}
 	model.Set(key.Data.(string), value.Data, nil)
 	return token.ReplyOk
@@ -47,8 +48,8 @@ func get(tokens ...*token.Token) *token.Token {
 		return token.NewError(eStrArgMore)
 	}
 	key := tokens[0]
-	if et := checkKeyType(key); et != nil {
-		return token.NewError(et.Error())
+	if err := checkKeyType(key); err != nil {
+		return token.NewError(err.Error())
 	}
 	val := model.Get(key.Data.(string))
 	if data, err := ItfToBulked(val); err != nil {
@@ -58,26 +59,39 @@ func get(tokens ...*token.Token) *token.Token {
 	}
 }
 
-func incr(tokens ...*token.Token) *token.Token {
-	rsp := get(tokens...)
-	if rsp.Label == label.Error {
-		return rsp
+func step(n int64, tokens ...*token.Token) *token.Token {
+	if len(tokens) < 1 {
+		return token.NewError(eStrArgMore)
 	}
-	num, err := ItfToInt(rsp.Data)
+	key := tokens[0]
+	if err := checkKeyType(key); err != nil {
+		return token.NewError(err.Error())
+	}
+	oldVal := model.Get(key.Data.(string))
+	num, err := ItfToInt(oldVal)
 	if err != nil {
 		return token.NewError(err.Error())
 	}
-	var val int64 = 1
 	if num != nil {
-		val = num.(int64) + 1
+		n = num.(int64) + n
 	}
-	rsp = token.NewInteger(val)
-	set(tokens[0], rsp)
-	return rsp
+	t := token.NewInteger(n)
+	set(tokens[0], t)
+	return t
+}
+
+func incr(tokens ...*token.Token) *token.Token {
+	return step(1, tokens...)
+}
+
+func desc(tokens ...*token.Token) *token.Token {
+	return step(-1, tokens...)
 }
 
 func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
 	switch cmd.Data.(string) {
+	case CmdDesc:
+		return desc(args...)
 	case CmdGet:
 		return get(args...)
 	case CmdSet:

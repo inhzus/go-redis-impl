@@ -19,7 +19,7 @@ func main() {
 	_ = cli.Connect()
 
 	cli.Set("c", 2)
-	cli.Incr("c")
+	cli.Desc("c")
 	cli.Get("c")
 
 	glog.Infof("time: %v", time.Now().Sub(startTime))
