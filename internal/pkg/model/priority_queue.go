@@ -5,10 +5,6 @@ type priorityQueue struct {
 	items []*Item
 }
 
-func newPriorityQueue() *priorityQueue {
-	return &priorityQueue{}
-}
-
 func (q priorityQueue) Len() int {
 	return len(q.items)
 }
@@ -42,4 +38,11 @@ func (q *priorityQueue) Pop() interface{} {
 	item.index = -1
 	q.items = old[0 : n-1]
 	return item
+}
+
+func (q *priorityQueue) Top() *Item {
+	if q.Len() == 0 {
+		return nil
+	}
+	return q.items[0]
 }

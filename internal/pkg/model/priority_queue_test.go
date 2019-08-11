@@ -10,7 +10,7 @@ import (
 )
 
 func TestPriorityQueuePush(t *testing.T) {
-	queue := newPriorityQueue()
+	queue := &priorityQueue{}
 	for i := 0; i < 10; i++ {
 		heap.Push(queue, &Item{})
 	}
@@ -18,7 +18,7 @@ func TestPriorityQueuePush(t *testing.T) {
 }
 
 func TestPriorityQueuePop(t *testing.T) {
-	queue := newPriorityQueue()
+	queue := &priorityQueue{}
 	for i := 0; i < 10; i++ {
 		heap.Push(queue, &Item{})
 	}
@@ -36,7 +36,7 @@ func TestPriorityQueuePop(t *testing.T) {
 }
 
 func TestPriorityQueueCheckOrder(t *testing.T) {
-	queue := newPriorityQueue()
+	queue := &priorityQueue{}
 	for i := 10; i > 0; i-- {
 		heap.Push(queue, newItem(fmt.Sprintf("key_%d", i), nil, time.Second*time.Duration(i)))
 	}
@@ -47,7 +47,7 @@ func TestPriorityQueueCheckOrder(t *testing.T) {
 }
 
 func TestPriorityQueueRemove(t *testing.T) {
-	queue := newPriorityQueue()
+	queue := &priorityQueue{}
 	items := make(map[string]*Item)
 	var itemRemove *Item
 	for i := 0; i < 5; i++ {
@@ -77,7 +77,7 @@ func TestPriorityQueueRemove(t *testing.T) {
 }
 
 func TestPriorityQueueUpdate(t *testing.T) {
-	queue := newPriorityQueue()
+	queue := &priorityQueue{}
 	item := &Item{}
 	heap.Push(queue, item)
 	assert.Equal(t, queue.Len(), 1, "The queue is supposed to be with 1 item")
