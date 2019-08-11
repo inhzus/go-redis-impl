@@ -5,8 +5,19 @@ import (
 )
 
 type Item struct {
+	key    string
 	row    interface{}
-	expire *time.Time
+	ttl    time.Duration
+	expire time.Time
+	index  int
+}
+
+func newItem(key string, row interface{}, ttl time.Duration) *Item {
+	item := &Item{key: key, row: row, ttl: ttl}
+	if ttl > 0 {
+		item.expire = time.Now().Add(ttl)
+	}
+	return item
 }
 
 type DataStorage struct {
@@ -26,8 +37,8 @@ func (d *DataStorage) Get(key string) interface{} {
 	}
 }
 
-func (d *DataStorage) Set(key string, value interface{}, expire *time.Time) interface{} {
-	item := &Item{row: value, expire: expire,}
+func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
+	item := newItem(key, value, ttl)
 	d.data[key] = item
 	return item.row
 }
@@ -40,6 +51,6 @@ func Get(key string) interface{} {
 	return Data.Get(key)
 }
 
-func Set(key string, value interface{}, expire *time.Time) interface{} {
-	return Data.Set(key, value, expire)
+func Set(key string, value interface{}, ttl time.Duration) interface{} {
+	return Data.Set(key, value, ttl)
 }

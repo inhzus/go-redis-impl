@@ -39,7 +39,7 @@ func set(tokens ...*token.Token) *token.Token {
 		err != nil {
 		return token.NewError(err.Error())
 	}
-	model.Set(key.Data.(string), value.Data, nil)
+	model.Set(key.Data.(string), value.Data, 0)
 	return token.ReplyOk
 }
 
