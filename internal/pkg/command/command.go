@@ -1,6 +1,8 @@
 package command
 
 import (
+	"time"
+
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
@@ -15,7 +17,9 @@ const (
 )
 
 const (
-	strPong = "pong"
+	strPong       = "pong"
+	TimeoutSec    = "EX"
+	TimeoutMilSec = "PX"
 )
 
 const (
@@ -39,7 +43,33 @@ func set(tokens ...*token.Token) *token.Token {
 		err != nil {
 		return token.NewError(err.Error())
 	}
-	model.Set(key.Data.(string), value.Data, 0)
+	var timeout time.Duration
+	for i := 2; i < len(tokens); i++ {
+		if err := checkType(tokens[i], "argument", label.String); err != nil {
+			return token.NewError(err.Error())
+		}
+		arg := tokens[i].Data.(string)
+		switch arg {
+		case TimeoutMilSec, TimeoutSec:
+			i++
+			if len(tokens) < i {
+				return token.NewError("argument missing of %v", arg)
+			}
+			if err := checkType(tokens[i], "timeout", label.Integer); err != nil {
+				return token.NewError(err.Error())
+			}
+			num := time.Duration(tokens[i].Data.(int64))
+			switch arg {
+			case TimeoutSec:
+				timeout = num * time.Second
+			case TimeoutMilSec:
+				timeout = num * time.Millisecond
+			}
+		default:
+			return token.NewError("argument not recognized")
+		}
+	}
+	model.Set(key.Data.(string), value.Data, timeout)
 	return token.ReplyOk
 }
 
@@ -59,7 +89,7 @@ func get(tokens ...*token.Token) *token.Token {
 	}
 }
 
-func step(n int64, tokens ...*token.Token) *token.Token {
+func step(n int64, tokens []*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -81,11 +111,11 @@ func step(n int64, tokens ...*token.Token) *token.Token {
 }
 
 func incr(tokens ...*token.Token) *token.Token {
-	return step(1, tokens...)
+	return step(1, tokens)
 }
 
 func desc(tokens ...*token.Token) *token.Token {
-	return step(-1, tokens...)
+	return step(-1, tokens)
 }
 
 func processCommand(cmd *token.Token, args []*token.Token) *token.Token {

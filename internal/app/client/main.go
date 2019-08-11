@@ -15,14 +15,13 @@ func init() {
 
 func main() {
 	startTime := time.Now()
-	cli := client.NewClient(&client.Option{
-		ReadTimeout:  time.Millisecond / 2,
-		WriteTimeout: time.Millisecond / 2})
+	cli := client.NewClient(&client.Option{})
 	_ = cli.Connect()
 
-	cli.Set("c", 2)
+	cli.Set("c", 2, time.Second)
 	cli.Desc("c")
 	cli.Get("c")
-
+	<-time.After(time.Second)
+	cli.Get("c")
 	glog.Infof("time: %v", time.Now().Sub(startTime))
 }
