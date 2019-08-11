@@ -118,7 +118,9 @@ func desc(tokens ...*token.Token) *token.Token {
 	return step(-1, tokens)
 }
 
-func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
+func Process(req *token.Token) *token.Token {
+	data := req.Data.([]*token.Token)
+	cmd, args := data[0], data[1:]
 	switch cmd.Data.(string) {
 	case CmdDesc:
 		return desc(args...)
@@ -131,24 +133,5 @@ func processCommand(cmd *token.Token, args []*token.Token) *token.Token {
 	case CmdIncr:
 		return incr(args...)
 	}
-	return token.ErrorDefault
-}
-
-func Process(req *token.Token) *token.Token {
-	if req == nil {
-		return token.ErrorDefault
-	}
-	data := req.Data.([]*token.Token)
-	if len(data) == 0 {
-		return token.ErrorDefault
-	}
-	cmd := data[0]
-	if cmd.Label == label.String {
-		return processCommand(cmd, data[1:])
-	}
-	var rspData []*token.Token
-	for _, item := range data {
-		rspData = append(rspData, Process(item))
-	}
-	return token.NewArray(rspData...)
+	return token.NewError("unrecognized command")
 }
