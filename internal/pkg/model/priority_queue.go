@@ -1,36 +1,12 @@
 package model
 
-import (
-	"container/heap"
-)
-
-func newPriorityQueue() *priorityQueue {
-	queue := &priorityQueue{}
-	heap.Init(queue)
-	return queue
-}
 
 type priorityQueue struct {
 	items []*Item
 }
 
-func (q *priorityQueue) update(Item *Item) {
-	heap.Fix(q, Item.index)
-}
-
-func (q *priorityQueue) push(Item *Item) {
-	heap.Push(q, Item)
-}
-
-func (q *priorityQueue) pop() *Item {
-	if q.Len() == 0 {
-		return nil
-	}
-	return heap.Pop(q).(*Item)
-}
-
-func (q *priorityQueue) remove(Item *Item) {
-	heap.Remove(q, Item.index)
+func newPriorityQueue() *priorityQueue {
+	return &priorityQueue{}
 }
 
 func (q priorityQueue) Len() int {
