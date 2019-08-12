@@ -6,17 +6,20 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/command"
+	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
+
+type Task struct {
+	Cli *command.Client
+	Req *token.Token
+	Rsp chan *token.Token
+}
 
 type Option struct {
 	Proto   string
 	Addr    string
-}
-
-type Task struct {
-	Req *token.Token
-	Rsp chan *token.Token
+	DBCount int
 }
 
 type Server struct {
@@ -33,6 +36,9 @@ func NewServer(option *Option) *Server {
 		option.Addr = "/tmp/redis.sock"
 	} else if option.Addr == "" {
 		option.Addr = ":6389"
+	}
+	if option.DBCount == 0 {
+		option.DBCount = 16
 	}
 	return &Server{option: option}
 }
@@ -53,6 +59,7 @@ func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
+	cli := &command.Client{conn, 0}
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
@@ -66,7 +73,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
-			s.queue <- &Task{Req: req, Rsp: c}
+			s.queue <- &Task{Cli: cli, Req: req, Rsp: c}
 			reply := <-c
 			rsp, err := reply.Serialize()
 			if err != nil {
@@ -85,6 +92,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) Serve() error {
+	model.Init(s.option.DBCount)
 	listener, err := net.Listen(s.option.Proto, s.option.Addr)
 	if err != nil {
 		return err
@@ -101,7 +109,7 @@ func (s *Server) Serve() error {
 				s.stop <- struct{}{}
 				return
 			case t := <-s.queue:
-				t.Rsp <- command.Process(t.Req)
+				t.Rsp <- command.Process(t.Cli, t.Req)
 			}
 		}
 	}()

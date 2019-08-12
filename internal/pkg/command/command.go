@@ -1,6 +1,7 @@
 package command
 
 import (
+	"net"
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
@@ -27,11 +28,16 @@ const (
 	eStrArgMore  = "not enough arguments"
 )
 
-func ping(_ ...*token.Token) *token.Token {
+type Client struct {
+	Conn    net.Conn
+	DataIdx int
+}
+
+func ping(_ *Client, _ ...*token.Token) *token.Token {
 	return token.NewString(strPong)
 }
 
-func set(tokens ...*token.Token) *token.Token {
+func set(cli *Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 2 {
 		return token.NewError(eStrArgMore)
 	}
@@ -39,8 +45,7 @@ func set(tokens ...*token.Token) *token.Token {
 	if err := checkKeyType(key); err != nil {
 		return token.NewError(err.Error())
 	}
-	if err := checkType(value, "value", label.Bulked, label.Integer, label.String);
-		err != nil {
+	if err := checkType(value, "value", label.Bulked, label.Integer, label.String); err != nil {
 		return token.NewError(err.Error())
 	}
 	var timeout time.Duration
@@ -69,11 +74,11 @@ func set(tokens ...*token.Token) *token.Token {
 			return token.NewError("argument not recognized")
 		}
 	}
-	model.Set(key.Data.(string), value.Data, timeout)
+	model.Set(cli.DataIdx, key.Data.(string), value.Data, timeout)
 	return token.ReplyOk
 }
 
-func get(tokens ...*token.Token) *token.Token {
+func get(cli *Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -81,7 +86,7 @@ func get(tokens ...*token.Token) *token.Token {
 	if err := checkKeyType(key); err != nil {
 		return token.NewError(err.Error())
 	}
-	val := model.Get(key.Data.(string))
+	val := model.Get(cli.DataIdx, key.Data.(string))
 	if data, err := ItfToBulked(val); err != nil {
 		return token.NewError(err.Error())
 	} else {
@@ -89,7 +94,7 @@ func get(tokens ...*token.Token) *token.Token {
 	}
 }
 
-func step(n int64, tokens []*token.Token) *token.Token {
+func step(cli *Client, tokens []*token.Token, n int64) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -97,7 +102,7 @@ func step(n int64, tokens []*token.Token) *token.Token {
 	if err := checkKeyType(key); err != nil {
 		return token.NewError(err.Error())
 	}
-	oldVal := model.Get(key.Data.(string))
+	oldVal := model.Get(cli.DataIdx, key.Data.(string))
 	num, err := ItfToInt(oldVal)
 	if err != nil {
 		return token.NewError(err.Error())
@@ -106,32 +111,32 @@ func step(n int64, tokens []*token.Token) *token.Token {
 		n = num.(int64) + n
 	}
 	t := token.NewInteger(n)
-	set(tokens[0], t)
+	set(cli, tokens[0], t)
 	return t
 }
 
-func incr(tokens ...*token.Token) *token.Token {
-	return step(1, tokens)
+func incr(cli *Client, tokens ...*token.Token) *token.Token {
+	return step(cli, tokens, 1)
 }
 
-func desc(tokens ...*token.Token) *token.Token {
-	return step(-1, tokens)
+func desc(cli *Client, tokens ...*token.Token) *token.Token {
+	return step(cli, tokens, -1)
 }
 
-func Process(req *token.Token) *token.Token {
+func Process(cli *Client, req *token.Token) *token.Token {
 	data := req.Data.([]*token.Token)
 	cmd, args := data[0], data[1:]
 	switch cmd.Data.(string) {
 	case CmdDesc:
-		return desc(args...)
+		return desc(cli, args...)
 	case CmdGet:
-		return get(args...)
+		return get(cli, args...)
 	case CmdSet:
-		return set(args...)
+		return set(cli, args...)
 	case CmdPing:
-		return ping(args...)
+		return ping(cli, args...)
 	case CmdIncr:
-		return incr(args...)
+		return incr(cli, args...)
 	}
 	return token.NewError("unrecognized command")
 }

@@ -40,10 +40,6 @@ type DataStorage struct {
 	queue *priorityQueue
 }
 
-func NewData() *DataStorage {
-	return &DataStorage{make(map[string]*Item), &priorityQueue{}}
-}
-
 func (d *DataStorage) scanPop(n int) {
 	now := time.Now()
 	for i := 0; i < CheckExpireNum; i++ {
@@ -87,13 +83,20 @@ func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) inte
 }
 
 var (
-	Data = NewData()
+	Data []*DataStorage
 )
 
-func Get(key string) interface{} {
-	return Data.Get(key)
+func Init(n int) {
+	Data = make([]*DataStorage, n)
+	for i := 0; i < n; i++ {
+		Data[i] = &DataStorage{make(map[string]*Item), &priorityQueue{}}
+	}
 }
 
-func Set(key string, value interface{}, ttl time.Duration) interface{} {
-	return Data.Set(key, value, ttl)
+func Get(idx int, key string) interface{} {
+	return Data[idx].Get(key)
+}
+
+func Set(idx int, key string, value interface{}, ttl time.Duration) interface{} {
+	return Data[idx].Set(key, value, ttl)
 }
