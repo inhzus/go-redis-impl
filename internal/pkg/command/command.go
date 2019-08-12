@@ -9,28 +9,45 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
+// command string
 const (
-	CmdDesc = "desc"
-	CmdGet  = "get"
-	CmdIncr = "incr"
-	CmdSet  = "set"
-	CmdPing = "ping"
+	CmdDesc    = "desc"
+	CmdDiscard = "discard"
+	CmdExec    = "exec"
+	CmdGet     = "get"
+	CmdIncr    = "incr"
+	CmdMulti   = "multi"
+	CmdSet     = "set"
+	CmdPing    = "ping"
+	CmdWatch   = "watch"
 )
 
+// argument string
 const (
-	strPong       = "pong"
 	TimeoutSec    = "EX"
 	TimeoutMilSec = "PX"
 )
 
 const (
+	strPong      = "pong"
 	eStrMismatch = "type of %v is %v instead of %v"
 	eStrArgMore  = "not enough arguments"
 )
 
+// Client entity: client information stored
 type Client struct {
-	Conn    net.Conn
+	Conn net.Conn
+	// database index selected
 	DataIdx int
+	// transaction state, true if transaction started
+	MultiState bool
+	// transaction queue
+	Queue []*token.Token
+}
+
+// NewClient returns a client selecting database 0, transaction state false
+func NewClient(conn net.Conn) *Client {
+	return &Client{Conn: conn, DataIdx: 0, MultiState: false}
 }
 
 func ping(_ *Client, _ ...*token.Token) *token.Token {
@@ -87,11 +104,11 @@ func get(cli *Client, tokens ...*token.Token) *token.Token {
 		return token.NewError(err.Error())
 	}
 	val := model.Get(cli.DataIdx, key.Data.(string))
-	if data, err := ItfToBulked(val); err != nil {
+	data, err := ItfToBulked(val)
+	if err != nil {
 		return token.NewError(err.Error())
-	} else {
-		return token.NewBulked(data)
 	}
+	return token.NewBulked(data)
 }
 
 func step(cli *Client, tokens []*token.Token, n int64) *token.Token {
@@ -123,20 +140,53 @@ func desc(cli *Client, tokens ...*token.Token) *token.Token {
 	return step(cli, tokens, -1)
 }
 
+func multi(cli *Client, _ ...*token.Token) *token.Token {
+	if cli.MultiState {
+		return token.NewError("multi calls can not be nested")
+	}
+	cli.MultiState = true
+	return token.ReplyOk
+}
+
+func exec(cli *Client, _ ...*token.Token) *token.Token {
+	if !cli.MultiState {
+		return token.NewError("exec without multi")
+	}
+	var responses []*token.Token
+	for _, t := range cli.Queue {
+		rsp := Process(cli, t)
+		responses = append(responses, rsp)
+	}
+	return token.NewArray(responses...)
+}
+
+// Process returns result of parsing request command and arguments
 func Process(cli *Client, req *token.Token) *token.Token {
 	data := req.Data.([]*token.Token)
 	cmd, args := data[0], data[1:]
+	if cli.MultiState {
+		switch cmd.Data.(string) {
+		case CmdDiscard, CmdExec, CmdMulti, CmdWatch:
+		default:
+			cli.Queue = append(cli.Queue, req)
+			return token.ReplyQueued
+		}
+	}
 	switch cmd.Data.(string) {
 	case CmdDesc:
 		return desc(cli, args...)
+	case CmdExec:
+		return exec(cli, args...)
 	case CmdGet:
 		return get(cli, args...)
-	case CmdSet:
-		return set(cli, args...)
-	case CmdPing:
-		return ping(cli, args...)
 	case CmdIncr:
 		return incr(cli, args...)
+	case CmdMulti:
+		return multi(cli, args...)
+	case CmdPing:
+		return ping(cli, args...)
+	case CmdSet:
+		return set(cli, args...)
 	}
 	return token.NewError("unrecognized command")
 }

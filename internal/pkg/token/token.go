@@ -14,6 +14,7 @@ var (
 	NilBulkedLen int64 = -1
 	ErrorDefault       = NewError("error")
 	ReplyOk            = NewString("ok")
+	ReplyQueued        = NewString("queued")
 )
 
 type Token struct {

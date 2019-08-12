@@ -59,7 +59,7 @@ func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := &command.Client{conn, 0}
+	cli := command.NewClient(conn)
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
