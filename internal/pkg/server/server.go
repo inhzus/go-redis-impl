@@ -14,9 +14,14 @@ type Option struct {
 	Addr    string
 }
 
+type Task struct {
+	Req *token.Token
+	Rsp chan *token.Token
+}
+
 type Server struct {
 	option *Option
-	queue  chan *token.Task
+	queue  chan *Task
 	stop   chan struct{}
 }
 
@@ -41,7 +46,7 @@ func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
 		return token.NewError("empty token")
 	}
 	c := make(chan *token.Token)
-	s.queue <- &token.Task{Req: t, Rsp: c}
+	s.queue <- &Task{Req: t, Rsp: c}
 	reply := <-c
 	return reply
 }
@@ -61,7 +66,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
-			s.queue <- &token.Task{Req: req, Rsp: c}
+			s.queue <- &Task{Req: req, Rsp: c}
 			reply := <-c
 			rsp, err := reply.Serialize()
 			if err != nil {
@@ -84,7 +89,7 @@ func (s *Server) Serve() error {
 	if err != nil {
 		return err
 	}
-	s.queue = make(chan *token.Task)
+	s.queue = make(chan *Task)
 	s.stop = make(chan struct{})
 
 	go func() {
