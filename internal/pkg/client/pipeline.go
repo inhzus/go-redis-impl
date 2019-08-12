@@ -7,7 +7,7 @@ import (
 )
 
 type Pipeline struct {
-	*Client
+	Client
 	commands []*token.Token
 }
 

@@ -158,7 +158,7 @@ func (c *Client) req(t *token.Token) *Response {
 }
 
 func (c *Client) Pipeline() *Pipeline {
-	p := &Pipeline{Client: c}
+	p := &Pipeline{Client: *c}
 	p.request = p.req
 	p.Client.request = p.req
 	return p
