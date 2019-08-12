@@ -16,14 +16,9 @@ var (
 	ReplyOk            = NewString("ok")
 )
 
-type Response struct {
-	Data *Token
-	Err  error
-}
-
 type Task struct {
 	Req *Token
-	Rsp chan *Response
+	Rsp chan *Token
 }
 
 type Token struct {

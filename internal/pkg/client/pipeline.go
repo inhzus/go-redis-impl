@@ -3,7 +3,6 @@ package client
 import (
 	"fmt"
 
-	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -12,9 +11,9 @@ type Pipeline struct {
 	commands []*token.Token
 }
 
-func (p *Pipeline) req(t *token.Token) *token.Response {
+func (p *Pipeline) req(t *token.Token) *Response {
 	p.commands = append(p.commands, t)
-	return &token.Response{Data: t}
+	return &Response{Data: t}
 }
 
 func (p *Pipeline) Exec() ([]*token.Token, error) {
@@ -27,26 +26,17 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 			return nil, fmt.Errorf("connection nil")
 		}
 	}
-	rsp := p.Client.Submit(token.NewArray(p.commands...))
-	if rsp.Err != nil {
-		return nil, rsp.Err
+	var responses []*Response
+	for t := range p.Client.Submit(p.commands...) {
+		responses = append(responses, t)
 	}
-	if rsp.Data.Label == label.Error {
-		return nil, fmt.Errorf(rsp.Data.Data.(string))
+	if len(responses) == len(p.commands) {
+		for i, item := range responses {
+			p.commands[i].Label = item.Data.Label
+			p.commands[i].Data = item.Data.Label
+		}
+		defer func() { p.commands = nil }()
+		return p.commands, nil
 	}
-	if rsp.Data.Label != label.Array {
-		return nil, fmt.Errorf("pipeline response label not expected: %v", rsp.Data.Label)
-	}
-	data := rsp.Data.Data.([]*token.Token)
-	if len(data) != len(p.commands) {
-		return nil, fmt.Errorf("pipeline response sequences not equal to request")
-	}
-	for i, item := range data {
-		p.commands[i].Label = item.Label
-		p.commands[i].Data = item.Data
-	}
-	defer func() {
-		p.commands = nil
-	}()
-	return p.commands, nil
+	return nil, responses[0].Err
 }

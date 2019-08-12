@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"time"
@@ -8,6 +9,16 @@ import (
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
+
+type Response struct {
+	Data *token.Token
+	Err  error
+}
+
+type Task struct {
+	Req []*token.Token
+	Rsp chan *Response
+}
 
 type Option struct {
 	Addr         string
@@ -19,9 +30,9 @@ type Option struct {
 type Client struct {
 	option  *Option
 	conn    net.Conn
-	queue   chan *token.Task
+	queue   chan *Task
 	stop    chan struct{}
-	request func(*token.Token) *token.Response
+	request func(*token.Token) *Response
 }
 
 func NewClient(option *Option) *Client {
@@ -38,44 +49,64 @@ func NewClient(option *Option) *Client {
 	return c
 }
 
-func (c *Client) consume(t *token.Token) *token.Response {
-	data, err := t.Serialize()
-	if err != nil {
-		return &token.Response{Err: err}
-	}
-	if c.option.WriteTimeout > 0 {
-		errCh := make(chan error)
-		go func() {
-			_, er := c.conn.Write(data)
-			errCh <- er
-		}()
-		select {
-		case <-time.After(c.option.WriteTimeout):
-			return &token.Response{Err: fmt.Errorf("write data to connection timeout")}
-		case err = <-errCh:
+func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
+	for {
+		buffer := &bytes.Buffer{}
+		for _, t := range ts {
+			d, err := t.Serialize()
+			if err != nil {
+				rspCh <- &Response{Err: err}
+				break
+			}
+			buffer.Write(d)
 		}
-	} else {
-		_, err = c.conn.Write(data)
-	}
-	if err != nil {
-		return &token.Response{Err: err}
-	}
-	var rsp *token.Response
-	if c.option.ReadTimeout > 0 {
-		rspCh := make(chan *token.Response)
-		go func() {
-			r := token.Deserialize(c.conn)
-			rspCh <- r
-		}()
-		select {
-		case <-time.After(c.option.ReadTimeout):
-			return &token.Response{Err: fmt.Errorf("read data from connection timeout")}
-		case rsp = <-rspCh:
+		data := buffer.Bytes()
+		var err error
+		if c.option.WriteTimeout > 0 {
+			errCh := make(chan error)
+			go func() {
+				_, er := c.conn.Write(data)
+				errCh <- er
+			}()
+			select {
+			case err = <-errCh:
+			case <-time.After(c.option.WriteTimeout):
+				rspCh <- &Response{Err: fmt.Errorf("write data to connection timeout")}
+				break
+			}
+		} else {
+			_, err = c.conn.Write(data)
 		}
-	} else {
-		rsp = token.Deserialize(c.conn)
+		if err != nil {
+			rspCh <- &Response{Err: err}
+			break
+		}
+		endCh := make(chan struct{})
+		var responses []*Response
+		go func() {
+			rsp, _ := token.Deserialize(c.conn)
+			for _, t := range rsp {
+				glog.Infof(t.Format())
+				responses = append(responses, &Response{Data: t})
+			}
+			endCh <- struct{}{}
+		}()
+		if c.option.ReadTimeout > 0 {
+			select {
+			case <-endCh:
+			case <-time.After(c.option.ReadTimeout):
+				rspCh <- &Response{Err: fmt.Errorf("read data from connection timeout")}
+				break
+			}
+		} else {
+			<-endCh
+		}
+		for _, rsp := range responses {
+			rspCh <- rsp
+		}
+		break
 	}
-	return rsp
+	close(rspCh)
 }
 
 func (c *Client) Connect() (err error) {
@@ -83,7 +114,7 @@ func (c *Client) Connect() (err error) {
 	if err != nil {
 		return
 	}
-	c.queue = make(chan *token.Task)
+	c.queue = make(chan *Task)
 	c.stop = make(chan struct{})
 
 	go func() {
@@ -93,12 +124,7 @@ func (c *Client) Connect() (err error) {
 				c.stop <- struct{}{}
 				return
 			case t := <-c.queue:
-				t.Rsp <- c.consume(t.Req)
-			//case <-time.After(time.Second * 15):
-			//	_, err = c.consume(token.NewArray(token.NewString(command.CmdPing)))
-			//	if err != nil {
-			//		glog.Errorf("failed to keep connection: %v", err)
-			//	}
+				c.consume(t.Req, t.Rsp)
 			}
 		}
 	}()
@@ -113,26 +139,22 @@ func (c *Client) Close() {
 	}
 }
 
-func (c *Client) Submit(t *token.Token) *token.Response {
+func (c *Client) Submit(t ...*token.Token) <-chan *Response {
+	ch := make(chan *Response)
 	if c.conn == nil {
 		defer c.Close()
 		if err := c.Connect(); err != nil {
-			return &token.Response{Err: err}
+			ch <- &Response{Err: err}
+			close(ch)
 		}
 	}
-	ch := make(chan *token.Response)
-	c.queue <- &token.Task{Req: t, Rsp: ch}
-	rsp := <-ch
-	if rsp.Err == nil {
-		glog.Infof("%v-> %v", t.Format(), rsp.Data.Format())
-	} else {
-		glog.Errorf("%v-> %v", t.Format(), rsp.Err.Error())
-	}
-	return rsp
+	c.queue <- &Task{Req: t, Rsp: ch}
+	return ch
 }
 
-func (c *Client) req(t *token.Token) *token.Response {
-	return c.Submit(t)
+func (c *Client) req(t *token.Token) *Response {
+	rsp := <-c.Submit(t)
+	return rsp
 }
 
 func (c *Client) Pipeline() *Pipeline {

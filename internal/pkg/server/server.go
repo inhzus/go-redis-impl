@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/command"
-	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -41,43 +40,42 @@ func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
 	if len(data) == 0 {
 		return token.NewError("empty token")
 	}
-	c := make(chan *token.Response)
-	if data[0].Label == label.String {
-		s.queue <- &token.Task{Req: t, Rsp: c}
-		reply := <-c
-		return reply.Data
-	}
-	var rspData []*token.Token
-	for _, item := range data {
-		rspData = append(rspData, s.submit(item, conn))
-	}
-	return token.NewArray(rspData...)
+	c := make(chan *token.Token)
+	s.queue <- &token.Task{Req: t, Rsp: c}
+	reply := <-c
+	return reply
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
 	for {
-		req := token.Deserialize(conn)
-		if req.Err != nil {
-			if req.Err == io.EOF {
+		ts, err := token.Deserialize(conn)
+		if err != nil {
+			if err == io.EOF {
 				glog.Infof("client %v connection closed", conn.RemoteAddr())
 				return
 			}
-			glog.Error(req.Err)
-		}
-		glog.Infof("request: %v", req.Data.Format())
-		reply := s.submit(req.Data, conn)
-		rsp, err := reply.Serialize()
-		if err != nil {
 			glog.Error(err)
-			rsp, _ = token.ErrorDefault.Serialize()
+		}
+		var data []byte
+		for _, req := range ts {
+			glog.Infof("request: %v", req.Format())
+			c := make(chan *token.Token)
+			s.queue <- &token.Task{Req: req, Rsp: c}
+			reply := <-c
+			rsp, err := reply.Serialize()
+			if err != nil {
+				glog.Error(err)
+				rsp, _ = token.ErrorDefault.Serialize()
+			}
+			data = append(data, rsp...)
 		}
 		go func(r []byte) {
 			_, err = conn.Write(r)
 			if err != nil {
 				glog.Error(err)
 			}
-		}(rsp)
+		}(data)
 	}
 }
 
@@ -98,7 +96,7 @@ func (s *Server) Serve() error {
 				s.stop <- struct{}{}
 				return
 			case t := <-s.queue:
-				t.Rsp <- &token.Response{Data: command.Process(t.Req)}
+				t.Rsp <- command.Process(t.Req)
 			}
 		}
 	}()

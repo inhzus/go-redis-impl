@@ -74,11 +74,18 @@ func parseItem(reader *bufio.Reader) (*Token, error) {
 	return nil, nil
 }
 
-func Deserialize(conn net.Conn) *Response {
+func Deserialize(conn net.Conn) ([]*Token, error) {
 	reader := bufio.NewReader(conn)
-	token, err := parseItem(reader)
-	if err != nil {
-		return &Response{Err: err}
+	var ts []*Token
+	for {
+		t, err := parseItem(reader)
+		if err != nil {
+			return nil, err
+		}
+		ts = append(ts, t)
+		if reader.Buffered() <= 0 {
+			break
+		}
 	}
-	return &Response{Data: token}
+	return ts, nil
 }

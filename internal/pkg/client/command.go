@@ -7,15 +7,15 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
-func (c *Client) Get(key string) *token.Response {
+func (c *Client) Get(key string) *Response {
 	row := token.NewArray(token.NewString(command.CmdGet), token.NewString(key))
 	return c.request(row)
 }
 
-func (c *Client) Set(key string, value interface{}, timeout time.Duration) *token.Response {
+func (c *Client) Set(key string, value interface{}, timeout time.Duration) *Response {
 	bulked, err := command.ItfToBulked(value)
 	if err != nil {
-		return &token.Response{Err: err}
+		return &Response{Err: err}
 	}
 	row := token.NewArray(token.NewString(command.CmdSet), token.NewString(key), token.NewBulked(bulked))
 	if timeout > 0 {
@@ -25,17 +25,17 @@ func (c *Client) Set(key string, value interface{}, timeout time.Duration) *toke
 	return c.request(row)
 }
 
-func (c *Client) Ping() *token.Response {
+func (c *Client) Ping() *Response {
 	row := token.NewArray(token.NewString(command.CmdPing))
 	return c.request(row)
 }
 
-func (c *Client) Incr(key string) *token.Response {
+func (c *Client) Incr(key string) *Response {
 	row := token.NewArray(token.NewString(command.CmdIncr), token.NewString(key))
 	return c.request(row)
 }
 
-func (c *Client) Desc(key string) *token.Response {
+func (c *Client) Desc(key string) *Response {
 	row := token.NewArray(token.NewString(command.CmdDesc), token.NewString(key))
 	return c.request(row)
 }
