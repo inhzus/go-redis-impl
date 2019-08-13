@@ -124,33 +124,33 @@ func desc(cli *model.Client, tokens ...*token.Token) *token.Token {
 }
 
 func multi(cli *model.Client, _ ...*token.Token) *token.Token {
-	if cli.MultiState {
+	if cli.Multi.State {
 		return token.NewError("multi calls can not be nested")
 	}
-	cli.MultiState = true
+	cli.Multi.State = true
 	return token.ReplyOk
 }
 
 func exec(cli *model.Client, _ ...*token.Token) *token.Token {
-	if !cli.MultiState {
+	if !cli.Multi.State {
 		return token.NewError("exec without multi")
 	}
-	cli.MultiState = false
+	cli.Multi.State = false
 	var responses []*token.Token
-	for _, t := range cli.Queue {
+	for _, t := range cli.Multi.Queue {
 		rsp := Process(cli, t)
 		responses = append(responses, rsp)
 	}
-	cli.Queue = nil
+	cli.Multi.Queue = nil
 	return token.NewArray(responses...)
 }
 
 func discard(cli *model.Client, _ ...*token.Token) *token.Token {
-	if !cli.MultiState {
+	if !cli.Multi.State {
 		return token.NewError("discard calls without multi")
 	}
-	cli.MultiState = false
-	cli.Queue = nil
+	cli.Multi.State = false
+	cli.Multi.Queue = nil
 	return token.ReplyOk
 }
 
@@ -158,11 +158,11 @@ func discard(cli *model.Client, _ ...*token.Token) *token.Token {
 func Process(cli *model.Client, req *token.Token) *token.Token {
 	data := req.Data.([]*token.Token)
 	cmd, args := data[0], data[1:]
-	if cli.MultiState {
+	if cli.Multi.State {
 		switch cmd.Data.(string) {
 		case CmdDiscard, CmdExec, CmdMulti, CmdWatch:
 		default:
-			cli.Queue = append(cli.Queue, req)
+			cli.Multi.Queue = append(cli.Multi.Queue, req)
 			return token.ReplyQueued
 		}
 	}
