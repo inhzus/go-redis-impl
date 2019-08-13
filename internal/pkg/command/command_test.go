@@ -276,6 +276,19 @@ func Test_exec(t *testing.T) {
 		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte(oldValue)), token.ReplyOk, token.NewBulked([]byte(newValue))),
 		Process(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewArray(), Process(cli, token.NewArray(token.NewString(CmdExec))))
+}
+
+func Test_discard(t *testing.T) {
+	assert.Equal(t, token.NewError("discard calls without multi"),
+		Process(cli, token.NewArray(token.NewString(CmdDiscard))))
+	assert.Equal(t, token.ReplyOk, multi(cli))
+	assert.Equal(t, token.ReplyQueued, Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString("a"))))
+	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdDiscard))))
+	assert.Equal(t, token.NewError("exec without multi"), Process(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewArray(), Process(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
 func TestProcess(t *testing.T) {

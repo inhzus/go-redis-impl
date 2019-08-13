@@ -49,7 +49,7 @@ func ItfToBulked(v interface{}) (interface{}, error) {
 	return data, nil
 }
 
-// ItfToInt converts intrface to int
+// ItfToInt converts interface to int
 func ItfToInt(v interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil

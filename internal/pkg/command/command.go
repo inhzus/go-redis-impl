@@ -158,7 +158,17 @@ func exec(cli *Client, _ ...*token.Token) *token.Token {
 		rsp := Process(cli, t)
 		responses = append(responses, rsp)
 	}
+	cli.Queue = nil
 	return token.NewArray(responses...)
+}
+
+func discard(cli *Client, _ ...*token.Token) *token.Token {
+	if !cli.MultiState {
+		return token.NewError("discard calls without multi")
+	}
+	cli.MultiState = false
+	cli.Queue = nil
+	return token.ReplyOk
 }
 
 // Process returns result of parsing request command and arguments
@@ -176,6 +186,8 @@ func Process(cli *Client, req *token.Token) *token.Token {
 	switch cmd.Data.(string) {
 	case CmdDesc:
 		return desc(cli, args...)
+	case CmdDiscard:
+		return discard(cli, args...)
 	case CmdExec:
 		return exec(cli, args...)
 	case CmdGet:
