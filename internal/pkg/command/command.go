@@ -74,8 +74,8 @@ func set(cli *Client, tokens ...*token.Token) *token.Token {
 		switch arg {
 		case TimeoutMilSec, TimeoutSec:
 			i++
-			if len(tokens) < i {
-				return token.NewError("argument missing of %v", arg)
+			if len(tokens) < i+1 {
+				return token.NewError("argument missing of %s", arg)
 			}
 			if err := checkType(tokens[i], "timeout", label.Integer); err != nil {
 				return token.NewError(err.Error())
@@ -152,6 +152,7 @@ func exec(cli *Client, _ ...*token.Token) *token.Token {
 	if !cli.MultiState {
 		return token.NewError("exec without multi")
 	}
+	cli.MultiState = false
 	var responses []*token.Token
 	for _, t := range cli.Queue {
 		rsp := Process(cli, t)
