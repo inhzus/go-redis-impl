@@ -26,6 +26,7 @@ func checkKeyType(t *token.Token) error {
 	return checkType(t, "key", label.String)
 }
 
+// ItfToBulked converts interface bulked
 func ItfToBulked(v interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil
@@ -48,6 +49,7 @@ func ItfToBulked(v interface{}) (interface{}, error) {
 	return data, nil
 }
 
+// ItfToInt converts intrface to int
 func ItfToInt(v interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil
@@ -58,20 +60,18 @@ func ItfToInt(v interface{}) (interface{}, error) {
 	switch v.(type) {
 	case []byte:
 		s := string(v.([]byte)[:])
-		if data, err = strconv.ParseInt(s, 10, 64);
-			err != nil {
+		if data, err = strconv.ParseInt(s, 10, 64); err != nil {
 			return nil, fmt.Errorf(errMsg, s)
 		}
 	case string:
 		s := v.(string)
-		if data, err = strconv.ParseInt(s, 10, 64);
-			err != nil {
+		if data, err = strconv.ParseInt(s, 10, 64); err != nil {
 			return nil, fmt.Errorf(errMsg, s)
 		}
 	case int64:
 		data = v.(int64)
 	default:
-		return nil, fmt.Errorf(errMsg, data)
+		return nil, fmt.Errorf(errMsg, v)
 	}
 	return data, nil
 }
