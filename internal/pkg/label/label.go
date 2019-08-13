@@ -2,6 +2,7 @@ package label
 
 import "strings"
 
+// protocol type label
 const (
 	String  Label = '+'
 	Error   Label = '-'
@@ -10,8 +11,10 @@ const (
 	Array   Label = '*'
 )
 
+// Label alias byte
 type Label = byte
 
+// ToStr convert Label to string for error string usage
 func ToStr(ls ...Label) string {
 	length := len(ls)
 	if length == 0 {
