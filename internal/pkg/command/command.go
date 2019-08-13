@@ -74,7 +74,7 @@ func set(cli *model.Client, tokens ...*token.Token) *token.Token {
 			return token.NewError("argument not recognized")
 		}
 	}
-	model.Set(cli.DataIdx, key.Data.(string), value.Data, timeout)
+	model.Set(cli, key.Data.(string), value.Data, timeout)
 	return token.ReplyOk
 }
 
@@ -86,7 +86,7 @@ func get(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if err := checkKeyType(key); err != nil {
 		return token.NewError(err.Error())
 	}
-	val := model.Get(cli.DataIdx, key.Data.(string))
+	val := model.Get(cli, key.Data.(string))
 	data, err := ItfToBulked(val)
 	if err != nil {
 		return token.NewError(err.Error())
@@ -102,7 +102,7 @@ func step(cli *model.Client, tokens []*token.Token, n int64) *token.Token {
 	if err := checkKeyType(key); err != nil {
 		return token.NewError(err.Error())
 	}
-	oldVal := model.Get(cli.DataIdx, key.Data.(string))
+	oldVal := model.Get(cli, key.Data.(string))
 	num, err := ItfToInt(oldVal)
 	if err != nil {
 		return token.NewError(err.Error())

@@ -102,11 +102,11 @@ func Init(n int) {
 }
 
 // Get returns correspond value of data indexed and key
-func Get(idx int, key string) interface{} {
-	return data[idx].Get(key)
+func Get(cli *Client, key string) interface{} {
+	return data[cli.DataIdx].Get(key)
 }
 
 // Set puts key-value pair and its ttl in data
-func Set(idx int, key string, value interface{}, ttl time.Duration) interface{} {
-	return data[idx].Set(key, value, ttl)
+func Set(cli *Client, key string, value interface{}, ttl time.Duration) interface{} {
+	return data[cli.DataIdx].Set(key, value, ttl)
 }

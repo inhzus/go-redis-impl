@@ -15,7 +15,7 @@ func TestNewClient(t *testing.T) {
 		args args
 		want *Client
 	}{
-		{"new client", args{conn: nil}, &Client{Conn: nil, DataIdx: 0, Multi: &MultiInfo{false, nil}}},
+		{"new client", args{conn: nil}, &Client{Conn: nil, DataIdx: 0, Multi: &MultiInfo{false, false, nil}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

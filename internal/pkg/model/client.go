@@ -10,6 +10,8 @@ import (
 type MultiInfo struct {
 	// true if transaction started
 	State bool
+	// true if watched key is changed
+	Dirty bool
 	// transaction queue
 	Queue []*token.Token
 }
