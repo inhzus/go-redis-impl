@@ -2,13 +2,15 @@ package model
 
 import (
 	"container/heap"
+	"container/list"
 	"time"
 )
 
 const (
-	CheckExpireNum = 10
+	checkExpireNum = 10
 )
 
+// Item is key-value pair stored in model
 type Item struct {
 	key    string
 	row    interface{}
@@ -25,7 +27,7 @@ func newItem(key string, row interface{}, ttl time.Duration) *Item {
 	return item
 }
 
-func (i *Item) Fix(row interface{}, ttl time.Duration) {
+func (i *Item) fix(row interface{}, ttl time.Duration) {
 	if ttl == 0 && i.expire.Before(time.Now()) {
 		i.ttl = 0
 	} else if ttl > 0 {
@@ -35,14 +37,15 @@ func (i *Item) Fix(row interface{}, ttl time.Duration) {
 	i.row = row
 }
 
-type DataStorage struct {
+type dataStorage struct {
 	data  map[string]*Item
 	queue *priorityQueue
+	watch map[string]list.List
 }
 
-func (d *DataStorage) scanPop(n int) {
+func (d *dataStorage) scanPop(n int) {
 	now := time.Now()
-	for i := 0; i < CheckExpireNum; i++ {
+	for i := 0; i < checkExpireNum; i++ {
 		top := d.queue.Top()
 		if top == nil {
 			return
@@ -56,8 +59,8 @@ func (d *DataStorage) scanPop(n int) {
 	}
 }
 
-func (d *DataStorage) Get(key string) interface{} {
-	d.scanPop(CheckExpireNum)
+func (d *dataStorage) Get(key string) interface{} {
+	d.scanPop(checkExpireNum)
 	r, ok := d.data[key]
 	if !ok {
 		return nil
@@ -68,35 +71,42 @@ func (d *DataStorage) Get(key string) interface{} {
 	return r.row
 }
 
-func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
-	d.scanPop(CheckExpireNum)
+func (d *dataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
+	d.scanPop(checkExpireNum)
 	item, ok := d.data[key]
 	if ok {
-		item.Fix(value, ttl)
-		heap.Fix(d.queue, item.index)
+		item.fix(value, ttl)
+		if item.ttl > 0 {
+			heap.Fix(d.queue, item.index)
+		}
 	} else {
 		item = newItem(key, value, ttl)
-		heap.Push(d.queue, item)
+		if item.ttl > 0 {
+			heap.Push(d.queue, item)
+		}
 		d.data[key] = item
 	}
 	return item.row
 }
 
 var (
-	Data []*DataStorage
+	data []*dataStorage
 )
 
+// Init initializes data
 func Init(n int) {
-	Data = make([]*DataStorage, n)
+	data = make([]*dataStorage, n)
 	for i := 0; i < n; i++ {
-		Data[i] = &DataStorage{make(map[string]*Item), &priorityQueue{}}
+		data[i] = &dataStorage{make(map[string]*Item), &priorityQueue{}, make(map[string]list.List)}
 	}
 }
 
+// Get returns correspond value of data indexed and key
 func Get(idx int, key string) interface{} {
-	return Data[idx].Get(key)
+	return data[idx].Get(key)
 }
 
+// Set puts key-value pair and its ttl in data
 func Set(idx int, key string, value interface{}, ttl time.Duration) interface{} {
-	return Data[idx].Set(key, value, ttl)
+	return data[idx].Set(key, value, ttl)
 }

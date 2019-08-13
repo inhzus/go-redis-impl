@@ -1,7 +1,6 @@
 package command
 
 import (
-	"net"
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
@@ -34,27 +33,11 @@ const (
 	eStrArgMore  = "not enough arguments"
 )
 
-// Client entity: client information stored
-type Client struct {
-	Conn net.Conn
-	// database index selected
-	DataIdx int
-	// transaction state, true if transaction started
-	MultiState bool
-	// transaction queue
-	Queue []*token.Token
-}
-
-// NewClient returns a client selecting database 0, transaction state false
-func NewClient(conn net.Conn) *Client {
-	return &Client{Conn: conn, DataIdx: 0, MultiState: false}
-}
-
-func ping(_ *Client, _ ...*token.Token) *token.Token {
+func ping(_ *model.Client, _ ...*token.Token) *token.Token {
 	return token.NewString(strPong)
 }
 
-func set(cli *Client, tokens ...*token.Token) *token.Token {
+func set(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 2 {
 		return token.NewError(eStrArgMore)
 	}
@@ -95,7 +78,7 @@ func set(cli *Client, tokens ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func get(cli *Client, tokens ...*token.Token) *token.Token {
+func get(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -111,7 +94,7 @@ func get(cli *Client, tokens ...*token.Token) *token.Token {
 	return token.NewBulked(data)
 }
 
-func step(cli *Client, tokens []*token.Token, n int64) *token.Token {
+func step(cli *model.Client, tokens []*token.Token, n int64) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -132,15 +115,15 @@ func step(cli *Client, tokens []*token.Token, n int64) *token.Token {
 	return t
 }
 
-func incr(cli *Client, tokens ...*token.Token) *token.Token {
+func incr(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return step(cli, tokens, 1)
 }
 
-func desc(cli *Client, tokens ...*token.Token) *token.Token {
+func desc(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return step(cli, tokens, -1)
 }
 
-func multi(cli *Client, _ ...*token.Token) *token.Token {
+func multi(cli *model.Client, _ ...*token.Token) *token.Token {
 	if cli.MultiState {
 		return token.NewError("multi calls can not be nested")
 	}
@@ -148,7 +131,7 @@ func multi(cli *Client, _ ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func exec(cli *Client, _ ...*token.Token) *token.Token {
+func exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	if !cli.MultiState {
 		return token.NewError("exec without multi")
 	}
@@ -162,7 +145,7 @@ func exec(cli *Client, _ ...*token.Token) *token.Token {
 	return token.NewArray(responses...)
 }
 
-func discard(cli *Client, _ ...*token.Token) *token.Token {
+func discard(cli *model.Client, _ ...*token.Token) *token.Token {
 	if !cli.MultiState {
 		return token.NewError("discard calls without multi")
 	}
@@ -172,7 +155,7 @@ func discard(cli *Client, _ ...*token.Token) *token.Token {
 }
 
 // Process returns result of parsing request command and arguments
-func Process(cli *Client, req *token.Token) *token.Token {
+func Process(cli *model.Client, req *token.Token) *token.Token {
 	data := req.Data.([]*token.Token)
 	cmd, args := data[0], data[1:]
 	if cli.MultiState {

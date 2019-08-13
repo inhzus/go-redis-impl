@@ -1,7 +1,6 @@
 package command
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
@@ -10,36 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var cli *Client
+var cli *model.Client
 
 func init() {
-	cli = NewClient(nil)
+	cli = model.NewClient(nil)
 	model.Init(16)
-}
-
-func TestNewClient(t *testing.T) {
-	type args struct {
-		conn net.Conn
-	}
-	tests := []struct {
-		name string
-		args args
-		want *Client
-	}{
-		{"new client", args{conn: nil}, &Client{Conn: nil, DataIdx: 0, MultiState: false, Queue: nil}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewClient(tt.args.conn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewClient() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
 
 func Test_ping(t *testing.T) {
 	type args struct {
-		in0 *Client
+		in0 *model.Client
 		in1 []*token.Token
 	}
 	tests := []struct {
@@ -60,7 +39,7 @@ func Test_ping(t *testing.T) {
 
 func Test_set(t *testing.T) {
 	type args struct {
-		cli    *Client
+		cli    *model.Client
 		tokens []*token.Token
 	}
 	tests := []struct {
@@ -114,7 +93,7 @@ func Test_set(t *testing.T) {
 func Test_get(t *testing.T) {
 	set(cli, []*token.Token{token.NewString("a"), token.NewInteger(4)}...)
 	type args struct {
-		cli    *Client
+		cli    *model.Client
 		tokens []*token.Token
 	}
 	tests := []struct {
@@ -145,7 +124,7 @@ func Test_step(t *testing.T) {
 
 	set(cli, []*token.Token{token.NewString("b"), token.NewBulked([]byte("test"))}...)
 	type args struct {
-		cli    *Client
+		cli    *model.Client
 		tokens []*token.Token
 		n      int64
 	}
@@ -181,7 +160,7 @@ func Test_step(t *testing.T) {
 
 func Test_incr(t *testing.T) {
 	type args struct {
-		cli    *Client
+		cli    *model.Client
 		tokens []*token.Token
 	}
 	tests := []struct {
@@ -204,7 +183,7 @@ func Test_incr(t *testing.T) {
 
 func Test_desc(t *testing.T) {
 	type args struct {
-		cli    *Client
+		cli    *model.Client
 		tokens []*token.Token
 	}
 	tests := []struct {
@@ -227,7 +206,7 @@ func Test_desc(t *testing.T) {
 
 func Test_multi(t *testing.T) {
 	type args struct {
-		cli *Client
+		cli *model.Client
 		in1 []*token.Token
 	}
 	tests := []struct {
@@ -258,7 +237,7 @@ func Test_exec(t *testing.T) {
 	key := "t_exec"
 	oldValue := "old value"
 	newValue := "new value"
-	c := NewClient(nil)
+	c := model.NewClient(nil)
 	assert.Equal(t, token.NewError("exec without multi"), exec(cli))
 	assert.Equal(t, token.ReplyOk, multi(cli))
 

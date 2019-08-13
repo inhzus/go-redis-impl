@@ -11,7 +11,7 @@ import (
 )
 
 type Task struct {
-	Cli *command.Client
+	Cli *model.Client
 	Req *token.Token
 	Rsp chan *token.Token
 }
@@ -59,7 +59,7 @@ func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := command.NewClient(conn)
+	cli := model.NewClient(conn)
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
