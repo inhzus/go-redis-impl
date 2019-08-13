@@ -12,7 +12,7 @@ func NewString(s string) *Token {
 
 func NewError(format string, a ...interface{}) *Token {
 	if len(a) != 0 {
-		format = fmt.Sprintf(format, a)
+		format = fmt.Sprintf(format, a...)
 	}
 	return &Token{label.Error, format}
 }
