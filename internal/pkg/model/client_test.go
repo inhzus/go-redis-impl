@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -13,6 +14,8 @@ import (
 func init() {
 	Init(16)
 }
+
+var cli = NewClient(nil)
 
 func TestNewClient(t *testing.T) {
 	type args struct {
@@ -61,7 +64,6 @@ func TestClient_Watch(t *testing.T) {
 	for i := 50; i < 100; i++ {
 		cs[i].Unwatch()
 	}
-	cli := NewClient(nil)
 	cli.Touch("10")
 	cli.Touch("1")
 	for i := 0; i < 100; i++ {
@@ -78,4 +80,51 @@ func TestClient_Watch(t *testing.T) {
 		assert.Nil(t, cs[i].Multi.Watched)
 	}
 	assert.Zero(t, len(data[0].watch))
+}
+
+func TestClient_Set(t *testing.T) {
+	KeyFmt := "a_%d"
+	for i := 0; i < 20; i++ {
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Second)
+	}
+	for i := 0; i < 20; i++ {
+		val := cli.Get(fmt.Sprintf(KeyFmt, i))
+		assert.Equal(t, val.(int), i)
+	}
+	for i := 0; i < 10; i++ {
+		cli.Set(fmt.Sprintf(KeyFmt, i), i+1, time.Second/2)
+	}
+	for i := 0; i < 10; i++ {
+		val := cli.Get(fmt.Sprintf(KeyFmt, i))
+		assert.Equal(t, val.(int), i+1)
+	}
+	<-time.After(time.Second / 2)
+	for i := 0; i < 10; i++ {
+		val := cli.Get(fmt.Sprintf(KeyFmt, i))
+		assert.Equal(t, val, nil)
+	}
+	<-time.After(time.Second / 2)
+	for i := 11; i < 20; i++ {
+		val := cli.Get(fmt.Sprintf(KeyFmt, i))
+		assert.Equal(t, val, nil)
+	}
+}
+
+func TestClient_Get(t *testing.T) {
+	KeyFmt := "a_%d"
+	for i := 0; i < 20; i++ {
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, 0)
+	}
+	assert.Equal(t, cli.Get("a_15"), 15)
+	for i := 0; i < 20; i++ {
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
+	}
+	<-time.After(time.Millisecond)
+	assert.Equal(t, cli.Get("a_13"), nil)
+	for i := 0; i < 20; i++ {
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
+	}
+	<-time.After(time.Millisecond)
+	cli.Set("a_15", 15, 0)
+	assert.Equal(t, cli.Get("a_15"), 15)
 }

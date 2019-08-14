@@ -99,13 +99,3 @@ func Init(n int) {
 		data[i] = &dataStorage{make(map[string]*Item), &priorityQueue{}, newWatchMap()}
 	}
 }
-
-// Get returns correspond value of data indexed and key
-func Get(cli *Client, key string) interface{} {
-	return data[cli.DataIdx].Get(key)
-}
-
-// Set puts key-value pair and its ttl in data
-func Set(cli *Client, key string, value interface{}, ttl time.Duration) interface{} {
-	return data[cli.DataIdx].Set(key, value, ttl)
-}

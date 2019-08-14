@@ -2,6 +2,7 @@ package model
 
 import (
 	"net"
+	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
@@ -53,4 +54,14 @@ func (c *Client) Unwatch() {
 // Touch set all clients that watch key kirty
 func (c *Client) Touch(key string) {
 	data[c.DataIdx].watch.Touch(key)
+}
+
+// Get returns correspond value of data indexed and key
+func (c *Client) Get(key string) interface{} {
+	return data[c.DataIdx].Get(key)
+}
+
+// Set puts key-value pair and its ttl in data
+func (c *Client) Set(key string, value interface{}, ttl time.Duration) interface{} {
+	return data[c.DataIdx].Set(key, value, ttl)
 }
