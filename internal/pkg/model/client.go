@@ -14,6 +14,8 @@ type MultiInfo struct {
 	Dirty bool
 	// transaction queue
 	Queue []*token.Token
+	// watch keys
+	Watched []*watchKey
 }
 
 // Client entity: client information stored
@@ -28,4 +30,27 @@ type Client struct {
 // NewClient returns a client selecting database 0, transaction state false
 func NewClient(conn net.Conn) *Client {
 	return &Client{Conn: conn, Multi: &MultiInfo{}}
+}
+
+// Watch append key to self watch list and append self to global watch map
+func (c *Client) Watch(key string) {
+	for _, v := range c.Multi.Watched {
+		if v.wc.key == key {
+			return
+		}
+	}
+	c.Multi.Watched = append(c.Multi.Watched, data[c.DataIdx].watch.Put(c, key))
+}
+
+// Unwatch cancel all watched keys
+func (c *Client) Unwatch() {
+	for _, v := range c.Multi.Watched {
+		data[c.DataIdx].watch.Remove(v)
+	}
+	c.Multi.Watched = nil
+}
+
+// Touch set all clients that watch key kirty
+func (c *Client) Touch(key string) {
+	data[c.DataIdx].watch.Touch(key)
 }

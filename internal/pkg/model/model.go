@@ -2,7 +2,6 @@ package model
 
 import (
 	"container/heap"
-	"container/list"
 	"time"
 )
 
@@ -40,7 +39,7 @@ func (i *Item) fix(row interface{}, ttl time.Duration) {
 type dataStorage struct {
 	data  map[string]*Item
 	queue *priorityQueue
-	watch map[string]list.List
+	watch watchMap
 }
 
 func (d *dataStorage) scanPop(n int) {
@@ -97,7 +96,7 @@ var (
 func Init(n int) {
 	data = make([]*dataStorage, n)
 	for i := 0; i < n; i++ {
-		data[i] = &dataStorage{make(map[string]*Item), &priorityQueue{}, make(map[string]list.List)}
+		data[i] = &dataStorage{make(map[string]*Item), &priorityQueue{}, newWatchMap()}
 	}
 }
 
