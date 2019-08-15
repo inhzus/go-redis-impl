@@ -49,11 +49,7 @@ func (c *Client) Unwatch() {
 		data[c.DataIdx].watch.Remove(v)
 	}
 	c.Multi.Watched = nil
-}
-
-// Touch set all clients that watch key kirty
-func (c *Client) Touch(key string) {
-	data[c.DataIdx].watch.Touch(key)
+	c.Multi.Dirty = false
 }
 
 // Get returns correspond value of data indexed and key
@@ -63,5 +59,6 @@ func (c *Client) Get(key string) interface{} {
 
 // Set puts key-value pair and its ttl in data
 func (c *Client) Set(key string, value interface{}, ttl time.Duration) interface{} {
+	data[c.DataIdx].watch.Touch(key)
 	return data[c.DataIdx].Set(key, value, ttl)
 }

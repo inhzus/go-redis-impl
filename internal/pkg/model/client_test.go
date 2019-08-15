@@ -64,8 +64,8 @@ func TestClient_Watch(t *testing.T) {
 	for i := 50; i < 100; i++ {
 		cs[i].Unwatch()
 	}
-	cli.Touch("10")
-	cli.Touch("1")
+	cli.Set("10", 1, 0)
+	cli.Set("1", 1, 0)
 	for i := 0; i < 100; i++ {
 		if i%5 == 1 && i%10 < 5 && i < 50 {
 			assert.True(t, cs[i].Multi.Dirty, fmt.Sprintf("index: %v", i))

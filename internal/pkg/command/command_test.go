@@ -270,6 +270,74 @@ func Test_discard(t *testing.T) {
 	assert.Equal(t, token.NewArray(), Process(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
+func Test_watch(t *testing.T) {
+	c := model.NewClient(nil)
+	key := "t_watch"
+	assert.Equal(t, token.NewError(eStrArgMore),
+		Process(cli, token.NewArray(token.NewString(CmdWatch))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+	assert.Equal(t, token.ReplyOk,
+		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewError("watch inside multi is not allowed"),
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+	assert.Equal(t, token.NewArray(token.NewBulked([]byte("2"))),
+		Process(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Zero(t, cli.Multi.Watched)
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.ReplyOk,
+		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(3))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+	assert.Equal(t, token.NewArray(token.NewBulked([]byte("3"))),
+		Process(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewInteger(4),
+		Process(c, token.NewArray(token.NewString(CmdIncr), token.NewString(key))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+	assert.Equal(t, token.NewArray(),
+		Process(cli, token.NewArray(token.NewString(CmdExec))))
+}
+
+func Test_unwatch(t *testing.T) {
+	c := model.NewClient(nil)
+	key := "t_unwatch"
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdUnwatch))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.ReplyOk,
+		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(1))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+	assert.Equal(t, token.NewArray(token.NewBulked([]byte("1"))),
+		Process(cli, token.NewArray(token.NewString(CmdExec))))
+
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdUnwatch))))
+	assert.Equal(t, token.ReplyQueued,
+		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+	assert.Equal(t, token.ReplyOk,
+		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+	assert.Equal(t, token.NewArray(),
+		Process(cli, token.NewArray(token.NewString(CmdExec))))
+}
+
 func TestProcess(t *testing.T) {
 	assert.Equal(t, token.NewString(strPong),
 		Process(cli, token.NewArray(token.NewString(CmdPing))))

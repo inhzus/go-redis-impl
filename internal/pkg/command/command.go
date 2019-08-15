@@ -18,6 +18,7 @@ const (
 	CmdMulti   = "multi"
 	CmdSet     = "set"
 	CmdPing    = "ping"
+	CmdUnwatch = "unwatch"
 	CmdWatch   = "watch"
 )
 
@@ -128,6 +129,7 @@ func multi(cli *model.Client, _ ...*token.Token) *token.Token {
 		return token.NewError("multi calls can not be nested")
 	}
 	cli.Multi.State = true
+	cli.Multi.Dirty = false
 	return token.ReplyOk
 }
 
@@ -135,13 +137,16 @@ func exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	if !cli.Multi.State {
 		return token.NewError("exec without multi")
 	}
-	cli.Multi.State = false
 	var responses []*token.Token
-	for _, t := range cli.Multi.Queue {
-		rsp := Process(cli, t)
-		responses = append(responses, rsp)
+	cli.Multi.State = false
+	if !cli.Multi.Dirty {
+		for _, t := range cli.Multi.Queue {
+			rsp := Process(cli, t)
+			responses = append(responses, rsp)
+		}
 	}
 	cli.Multi.Queue = nil
+	cli.Unwatch()
 	return token.NewArray(responses...)
 }
 
@@ -151,6 +156,23 @@ func discard(cli *model.Client, _ ...*token.Token) *token.Token {
 	}
 	cli.Multi.State = false
 	cli.Multi.Queue = nil
+	cli.Unwatch()
+	return token.ReplyOk
+}
+
+func watch(cli *model.Client, tokens ...*token.Token) *token.Token {
+	if len(tokens) < 1 {
+		return token.NewError(eStrArgMore)
+	}
+	if cli.Multi.State {
+		return token.NewError("watch inside multi is not allowed")
+	}
+	cli.Watch(tokens[0].Data.(string))
+	return token.ReplyOk
+}
+
+func unwatch(cli *model.Client, tokens ...*token.Token) *token.Token {
+	cli.Unwatch()
 	return token.ReplyOk
 }
 
@@ -183,6 +205,10 @@ func Process(cli *model.Client, req *token.Token) *token.Token {
 		return ping(cli, args...)
 	case CmdSet:
 		return set(cli, args...)
+	case CmdWatch:
+		return watch(cli, args...)
+	case CmdUnwatch:
+		return unwatch(cli, args...)
 	}
 	return token.NewError("unrecognized command")
 }
