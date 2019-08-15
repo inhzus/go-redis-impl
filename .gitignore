@@ -1,5 +1,3 @@
 .idea
-client.out
-server.out
 *.rdb
 .vscode
