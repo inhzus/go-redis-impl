@@ -80,6 +80,9 @@ func TestClient_Watch(t *testing.T) {
 		assert.Nil(t, cs[i].Multi.Watched)
 	}
 	assert.Zero(t, len(data[0].watch))
+	cli.Set("10", 1, time.Nanosecond)
+	cli.Set("1", 1, time.Nanosecond)
+	<-time.After(time.Millisecond)
 }
 
 func TestClient_Set(t *testing.T) {

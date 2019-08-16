@@ -2,6 +2,7 @@ package model
 
 import (
 	"container/heap"
+	"container/list"
 	"time"
 )
 
@@ -13,25 +14,24 @@ const (
 type Item struct {
 	key    string
 	row    interface{}
-	ttl    time.Duration
-	expire time.Time
+	expire int64
 	index  int
+	elem   *list.Element
 }
 
 func newItem(key string, row interface{}, ttl time.Duration) *Item {
-	item := &Item{key: key, row: row, ttl: ttl}
+	item := &Item{key: key, row: row}
 	if ttl > 0 {
-		item.expire = time.Now().Add(ttl)
+		item.expire = time.Now().Add(ttl).UnixNano()
 	}
 	return item
 }
 
 func (i *Item) fix(row interface{}, ttl time.Duration) {
-	if ttl == 0 && i.expire.Before(time.Now()) {
-		i.ttl = 0
+	if ttl == 0 && i.expire < time.Now().UnixNano() {
+		i.expire = 0
 	} else if ttl > 0 {
-		i.ttl = ttl
-		i.expire = time.Now().Add(ttl)
+		i.expire = time.Now().Add(ttl).UnixNano()
 	}
 	i.row = row
 }
@@ -43,13 +43,13 @@ type dataStorage struct {
 }
 
 func (d *dataStorage) scanPop(n int) {
-	now := time.Now()
+	now := time.Now().UnixNano()
 	for i := 0; i < checkExpireNum; i++ {
 		top := d.queue.Top()
 		if top == nil {
 			return
 		}
-		if top.ttl > 0 && top.expire.Before(now) {
+		if top.expire > 0 && top.expire < now {
 			heap.Pop(d.queue)
 			delete(d.data, top.key)
 		} else {
@@ -64,7 +64,7 @@ func (d *dataStorage) Get(key string) interface{} {
 	if !ok {
 		return nil
 	}
-	if r.ttl > 0 && r.expire.Before(time.Now()) {
+	if r.expire > 0 && r.expire < time.Now().UnixNano() {
 		return nil
 	}
 	return r.row
@@ -75,14 +75,12 @@ func (d *dataStorage) Set(key string, value interface{}, ttl time.Duration) inte
 	item, ok := d.data[key]
 	if ok {
 		item.fix(value, ttl)
-		if item.ttl > 0 {
+		if ttl > 0 {
 			heap.Fix(d.queue, item.index)
 		}
 	} else {
 		item = newItem(key, value, ttl)
-		if item.ttl > 0 {
-			heap.Push(d.queue, item)
-		}
+		heap.Push(d.queue, item)
 		d.data[key] = item
 	}
 	return item.row

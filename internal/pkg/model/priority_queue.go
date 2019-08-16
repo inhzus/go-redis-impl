@@ -1,6 +1,5 @@
 package model
 
-
 type priorityQueue struct {
 	items []*Item
 }
@@ -10,13 +9,13 @@ func (q priorityQueue) Len() int {
 }
 
 func (q priorityQueue) Less(i, j int) bool {
-	if q.items[i].ttl <= 0 {
+	if q.items[i].expire <= 0 {
 		return false
 	}
-	if q.items[j].ttl <= 0 {
+	if q.items[j].expire <= 0 {
 		return true
 	}
-	return q.items[i].expire.Before(q.items[j].expire)
+	return q.items[i].expire < q.items[j].expire
 }
 
 func (q priorityQueue) Swap(i, j int) {
