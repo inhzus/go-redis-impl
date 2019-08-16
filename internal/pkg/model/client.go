@@ -23,14 +23,14 @@ type MultiInfo struct {
 type Client struct {
 	Conn net.Conn
 	// database index selected
-	DataIdx int
+	Data *DataStorage
 	// transaction info
 	Multi *MultiInfo
 }
 
 // NewClient returns a client selecting database 0, transaction state false
-func NewClient(conn net.Conn) *Client {
-	return &Client{Conn: conn, Multi: &MultiInfo{}}
+func NewClient(conn net.Conn, dataStorage *DataStorage) *Client {
+	return &Client{Conn: conn, Data: dataStorage, Multi: &MultiInfo{}}
 }
 
 // Watch append key to self watch list and append self to global watch map
@@ -40,13 +40,13 @@ func (c *Client) Watch(key string) {
 			return
 		}
 	}
-	c.Multi.Watched = append(c.Multi.Watched, data[c.DataIdx].watch.Put(c, key))
+	c.Multi.Watched = append(c.Multi.Watched, c.Data.watch.Put(c, key))
 }
 
 // Unwatch cancel all watched keys
 func (c *Client) Unwatch() {
 	for _, v := range c.Multi.Watched {
-		data[c.DataIdx].watch.Remove(v)
+		c.Data.watch.Remove(v)
 	}
 	c.Multi.Watched = nil
 	c.Multi.Dirty = false
@@ -54,11 +54,11 @@ func (c *Client) Unwatch() {
 
 // Get returns correspond value of data indexed and key
 func (c *Client) Get(key string) interface{} {
-	return data[c.DataIdx].Get(key)
+	return c.Data.Get(key)
 }
 
 // Set puts key-value pair and its ttl in data
 func (c *Client) Set(key string, value interface{}, ttl time.Duration) interface{} {
-	data[c.DataIdx].watch.Touch(key)
-	return data[c.DataIdx].Set(key, value, ttl)
+	c.Data.watch.Touch(key)
+	return c.Data.Set(key, value, ttl)
 }

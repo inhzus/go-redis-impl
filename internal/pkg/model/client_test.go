@@ -11,26 +11,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init() {
-	Init(16)
-}
-
-var cli = NewClient(nil)
+var data = NewDataStorage()
+var cli = NewClient(nil, data)
 
 func TestNewClient(t *testing.T) {
+	d := NewDataStorage()
 	type args struct {
 		conn net.Conn
+		data *DataStorage
 	}
 	tests := []struct {
 		name string
 		args args
 		want *Client
 	}{
-		{"new client", args{conn: nil}, &Client{Conn: nil, DataIdx: 0, Multi: &MultiInfo{false, false, nil, nil}}},
+		{"new client", args{conn: nil, data: d}, &Client{Conn: nil, Data: d, Multi: &MultiInfo{false, false, nil, nil}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewClient(tt.args.conn); !reflect.DeepEqual(got, tt.want) {
+			if got := NewClient(tt.args.conn, tt.args.data); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewClient() = %v, want %v", got, tt.want)
 			}
 		})
@@ -41,7 +40,7 @@ func TestClient_Watch(t *testing.T) {
 	const Num = 100
 	cs := make([]*Client, Num)
 	for i := range cs {
-		cs[i] = NewClient(nil)
+		cs[i] = NewClient(nil, data)
 	}
 	for i := 0; i < 100; i++ {
 		cs[i].Watch(strconv.FormatInt(int64(i%5), 10))
@@ -50,16 +49,16 @@ func TestClient_Watch(t *testing.T) {
 			cs[i].Multi.State = true
 		}
 	}
-	assert.Equal(t, 10, len(data[0].watch))
+	assert.Equal(t, 10, len(data.watch))
 	for i := 0; i < 5; i++ {
 		k := strconv.FormatInt(int64(i), 10)
-		assert.Equal(t, 20, data[0].watch[k].clients.Len())
-		assert.Equal(t, k, data[0].watch[k].key)
+		assert.Equal(t, 20, data.watch[k].clients.Len())
+		assert.Equal(t, k, data.watch[k].key)
 	}
 	for i := 5; i < 10; i++ {
 		k := strconv.FormatInt(int64(i), 10)
-		assert.Equal(t, 10, data[0].watch[k].clients.Len())
-		assert.Equal(t, k, data[0].watch[k].key)
+		assert.Equal(t, 10, data.watch[k].clients.Len())
+		assert.Equal(t, k, data.watch[k].key)
 	}
 	for i := 50; i < 100; i++ {
 		cs[i].Unwatch()
@@ -79,7 +78,7 @@ func TestClient_Watch(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		assert.Nil(t, cs[i].Multi.Watched)
 	}
-	assert.Zero(t, len(data[0].watch))
+	assert.Zero(t, len(data.watch))
 	cli.Set("10", 1, time.Nanosecond)
 	cli.Set("1", 1, time.Nanosecond)
 	<-time.After(time.Millisecond)

@@ -10,13 +10,14 @@ import (
 )
 
 var cli *model.Client
+var proc *Processor
 
 func init() {
-	cli = model.NewClient(nil)
-	model.Init(16)
+	proc = NewProcessor(16)
+	cli = model.NewClient(nil, proc.Data[0])
 }
 
-func Test_ping(t *testing.T) {
+func TestProcessor_ping(t *testing.T) {
 	type args struct {
 		in0 *model.Client
 		in1 []*token.Token
@@ -30,14 +31,14 @@ func Test_ping(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ping(tt.args.in0, tt.args.in1...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.ping(tt.args.in0, tt.args.in1...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ping() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_set(t *testing.T) {
+func TestProcessor_set(t *testing.T) {
 	type args struct {
 		cli    *model.Client
 		tokens []*token.Token
@@ -83,15 +84,15 @@ func Test_set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := set(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.set(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("set() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_get(t *testing.T) {
-	set(cli, []*token.Token{token.NewString("a"), token.NewInteger(4)}...)
+func TestProcessor_get(t *testing.T) {
+	proc.set(cli, []*token.Token{token.NewString("a"), token.NewInteger(4)}...)
 	type args struct {
 		cli    *model.Client
 		tokens []*token.Token
@@ -113,16 +114,15 @@ func Test_get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := get(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.get(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("get() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_step(t *testing.T) {
-
-	set(cli, []*token.Token{token.NewString("b"), token.NewBulked([]byte("test"))}...)
+func TestProcessor_step(t *testing.T) {
+	proc.set(cli, []*token.Token{token.NewString("b"), token.NewBulked([]byte("test"))}...)
 	type args struct {
 		cli    *model.Client
 		tokens []*token.Token
@@ -151,14 +151,14 @@ func Test_step(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := step(tt.args.cli, tt.args.tokens, tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.step(tt.args.cli, tt.args.tokens, tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("step() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_incr(t *testing.T) {
+func TestProcessor_incr(t *testing.T) {
 	type args struct {
 		cli    *model.Client
 		tokens []*token.Token
@@ -174,14 +174,14 @@ func Test_incr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := incr(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.incr(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("incr() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_desc(t *testing.T) {
+func TestProcessor_desc(t *testing.T) {
 	type args struct {
 		cli    *model.Client
 		tokens []*token.Token
@@ -197,14 +197,14 @@ func Test_desc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := desc(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.desc(tt.args.cli, tt.args.tokens...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("desc() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_multi(t *testing.T) {
+func TestProcessor_multi(t *testing.T) {
 	type args struct {
 		cli *model.Client
 		in1 []*token.Token
@@ -223,145 +223,145 @@ func Test_multi(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := multi(tt.args.cli, tt.args.in1...); !reflect.DeepEqual(got, tt.want) {
+			if got := proc.multi(tt.args.cli, tt.args.in1...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("multi() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 	assert.Equal(t, token.NewError("multi calls can not be nested"),
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
-	exec(cli)
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
+	proc.exec(cli)
 }
 
-func Test_exec(t *testing.T) {
+func TestProcessor_exec(t *testing.T) {
 	key := "t_exec"
 	oldValue := "old value"
 	newValue := "new value"
-	c := model.NewClient(nil)
-	assert.Equal(t, token.NewError("exec without multi"), exec(cli))
-	assert.Equal(t, token.ReplyOk, multi(cli))
+	c := model.NewClient(nil, proc.Data[0])
+	assert.Equal(t, token.NewError("exec without multi"), proc.exec(cli))
+	assert.Equal(t, token.ReplyOk, proc.multi(cli))
 
-	assert.Equal(t, token.ReplyQueued, Process(cli,
+	assert.Equal(t, token.ReplyQueued, proc.Exec(cli,
 		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
-	assert.Equal(t, token.ReplyQueued, Process(cli,
+	assert.Equal(t, token.ReplyQueued, proc.Exec(cli,
 		token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewString(newValue))))
 
-	assert.Equal(t, token.ReplyOk, Process(c,
+	assert.Equal(t, token.ReplyOk, proc.Exec(c,
 		token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewString(oldValue))))
-	assert.Equal(t, token.NewBulked([]byte(oldValue)), Process(c,
+	assert.Equal(t, token.NewBulked([]byte(oldValue)), proc.Exec(c,
 		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 
-	assert.Equal(t, token.ReplyQueued, Process(cli,
+	assert.Equal(t, token.ReplyQueued, proc.Exec(cli,
 		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte(oldValue)), token.ReplyOk, token.NewBulked([]byte(newValue))),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
-	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdMulti))))
-	assert.Equal(t, token.NewArray(), Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyOk, proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewArray(), proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
-func Test_discard(t *testing.T) {
+func TestProcessor_discard(t *testing.T) {
 	assert.Equal(t, token.NewError("discard calls without multi"),
-		Process(cli, token.NewArray(token.NewString(CmdDiscard))))
-	assert.Equal(t, token.ReplyOk, multi(cli))
-	assert.Equal(t, token.ReplyQueued, Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString("a"))))
-	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdDiscard))))
-	assert.Equal(t, token.NewError("exec without multi"), Process(cli, token.NewArray(token.NewString(CmdExec))))
-	assert.Equal(t, token.ReplyOk, Process(cli, token.NewArray(token.NewString(CmdMulti))))
-	assert.Equal(t, token.NewArray(), Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdDiscard))))
+	assert.Equal(t, token.ReplyOk, proc.multi(cli))
+	assert.Equal(t, token.ReplyQueued, proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString("a"))))
+	assert.Equal(t, token.ReplyOk, proc.Exec(cli, token.NewArray(token.NewString(CmdDiscard))))
+	assert.Equal(t, token.NewError("exec without multi"), proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyOk, proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
+	assert.Equal(t, token.NewArray(), proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
-func Test_watch(t *testing.T) {
-	c := model.NewClient(nil)
+func TestProcessor_watch(t *testing.T) {
+	c := model.NewClient(nil, proc.Data[0])
 	key := "t_watch"
 	assert.Equal(t, token.NewError(eStrArgMore),
-		Process(cli, token.NewArray(token.NewString(CmdWatch))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch))))
 	assert.Equal(t, token.NewError("type of key is bulked instead of string"),
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewBulked([]byte(key)))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewBulked([]byte(key)))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+		proc.Exec(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
 	assert.Equal(t, token.NewError("watch inside multi is not allowed"),
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("2"))),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 	assert.Zero(t, cli.Multi.Watched)
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
 	assert.Equal(t, token.ReplyOk,
-		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(3))))
+		proc.Exec(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(3))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("3"))),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
 	assert.Equal(t, token.NewInteger(4),
-		Process(c, token.NewArray(token.NewString(CmdIncr), token.NewString(key))))
+		proc.Exec(c, token.NewArray(token.NewString(CmdIncr), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
-func Test_unwatch(t *testing.T) {
-	c := model.NewClient(nil)
+func TestProcessor_unwatch(t *testing.T) {
+	c := model.NewClient(nil, proc.Data[0])
 	key := "t_unwatch"
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdUnwatch))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdUnwatch))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
 	assert.Equal(t, token.ReplyOk,
-		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(1))))
+		proc.Exec(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(1))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("1"))),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdMulti))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdUnwatch))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdUnwatch))))
 	assert.Equal(t, token.ReplyQueued,
-		Process(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		Process(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+		proc.Exec(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
 	assert.Equal(t, token.NewArray(),
-		Process(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
-func Test_sel(t *testing.T) {
+func TestProcessor_sel(t *testing.T) {
 	key := "t_sel"
-	c := model.NewClient(nil)
-	assert.Equal(t, token.NewError(eStrArgMore), sel(cli))
-	assert.Equal(t, token.NewError("type of index is string instead of integer"), sel(cli, token.NewString("1")))
-	assert.Equal(t, token.ReplyOk, sel(cli, token.NewInteger(1)))
-	assert.Equal(t, token.ReplyOk, set(cli, token.NewString(key), token.NewString("value")))
-	assert.Equal(t, token.NewBulked(nil), get(c, token.NewString(key)))
-	assert.Equal(t, token.ReplyOk, sel(c, token.NewInteger(1)))
-	assert.Equal(t, token.NewBulked([]byte("value")), get(c, token.NewString(key)))
+	c := model.NewClient(nil, proc.Data[0])
+	assert.Equal(t, token.NewError(eStrArgMore), proc.sel(cli))
+	assert.Equal(t, token.NewError("type of index is string instead of integer"), proc.sel(cli, token.NewString("1")))
+	assert.Equal(t, token.ReplyOk, proc.sel(cli, token.NewInteger(1)))
+	assert.Equal(t, token.ReplyOk, proc.set(cli, token.NewString(key), token.NewString("value")))
+	assert.Equal(t, token.NewBulked(nil), proc.get(c, token.NewString(key)))
+	assert.Equal(t, token.ReplyOk, proc.sel(c, token.NewInteger(1)))
+	assert.Equal(t, token.NewBulked([]byte("value")), proc.get(c, token.NewString(key)))
 }
 
-func TestProcess(t *testing.T) {
+func TestProcessor_Exec(t *testing.T) {
 	assert.Equal(t, token.NewString(strPong),
-		Process(cli, token.NewArray(token.NewString(CmdPing))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdPing))))
 	assert.Equal(t, token.NewInteger(-1),
-		Process(cli, token.NewArray(token.NewString(CmdDesc), token.NewString("t_process"))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdDesc), token.NewString("t_process"))))
 	assert.Equal(t, token.NewInteger(0),
-		Process(cli, token.NewArray(token.NewString(CmdIncr), token.NewString("t_process"))))
+		proc.Exec(cli, token.NewArray(token.NewString(CmdIncr), token.NewString("t_process"))))
 	assert.Equal(t, token.ReplyOk,
-		Process(cli, token.NewArray(token.NewString(CmdSelect), token.NewInteger(2))))
-	assert.Equal(t, 2, cli.DataIdx)
+		proc.Exec(cli, token.NewArray(token.NewString(CmdSelect), token.NewInteger(2))))
+	assert.Equal(t, proc.Data[2], cli.Data)
 	assert.Equal(t, token.NewError("unrecognized command"),
-		Process(cli, token.NewArray(token.NewString("unknown command"))))
+		proc.Exec(cli, token.NewArray(token.NewString("unknown command"))))
 }

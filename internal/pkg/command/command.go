@@ -35,11 +35,65 @@ const (
 	eStrArgMore  = "not enough arguments"
 )
 
-func ping(_ *model.Client, _ ...*token.Token) *token.Token {
+type Processor struct {
+	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
+	Data    []*model.DataStorage
+}
+
+func NewProcessor(n int) *Processor {
+	p := &Processor{}
+	p.ctrlMap = map[string]func(*model.Client, ...*token.Token) *token.Token{
+		CmdDesc:    p.desc,
+		CmdDiscard: p.discard,
+		CmdExec:    p.exec,
+		CmdGet:     p.get,
+		CmdIncr:    p.incr,
+		CmdMulti:   p.multi,
+		CmdSelect:  p.sel,
+		CmdSet:     p.set,
+		CmdPing:    p.ping,
+		CmdUnwatch: p.unwatch,
+		CmdWatch:   p.watch,
+	}
+	p.Data = make([]*model.DataStorage, n)
+	for i := 0; i < n; i++ {
+		p.Data[i] = model.NewDataStorage()
+	}
+	return p
+}
+
+// Exec returns result of parsing request command and arguments
+func (p *Processor) Exec(cli *model.Client, req *token.Token) *token.Token {
+	if req == nil {
+		return token.NewError("empty request")
+	}
+	data, ok := req.Data.([]*token.Token)
+	if !ok || len(data) == 0 {
+		return token.NewError("empty token")
+	}
+	cmd, args := data[0], data[1:]
+	if err := checkType(cmd, "command", label.String); err != nil {
+		return token.NewError(err.Error())
+	}
+	if cli.Multi.State {
+		switch cmd.Data.(string) {
+		case CmdDiscard, CmdExec, CmdMulti, CmdWatch:
+		default:
+			cli.Multi.Queue = append(cli.Multi.Queue, req)
+			return token.ReplyQueued
+		}
+	}
+	if proc, ok := p.ctrlMap[cmd.Data.(string)]; ok {
+		return proc(cli, args...)
+	}
+	return token.NewError("unrecognized command")
+}
+
+func (p *Processor) ping(_ *model.Client, _ ...*token.Token) *token.Token {
 	return token.NewString(strPong)
 }
 
-func set(cli *model.Client, tokens ...*token.Token) *token.Token {
+func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 2 {
 		return token.NewError(eStrArgMore)
 	}
@@ -80,7 +134,7 @@ func set(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func get(cli *model.Client, tokens ...*token.Token) *token.Token {
+func (p *Processor) get(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -96,7 +150,7 @@ func get(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return token.NewBulked(data)
 }
 
-func step(cli *model.Client, tokens []*token.Token, n int64) *token.Token {
+func (p *Processor) step(cli *model.Client, tokens []*token.Token, n int64) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -113,19 +167,19 @@ func step(cli *model.Client, tokens []*token.Token, n int64) *token.Token {
 		n = num.(int64) + n
 	}
 	t := token.NewInteger(n)
-	set(cli, tokens[0], t)
+	p.set(cli, tokens[0], t)
 	return t
 }
 
-func incr(cli *model.Client, tokens ...*token.Token) *token.Token {
-	return step(cli, tokens, 1)
+func (p *Processor) incr(cli *model.Client, tokens ...*token.Token) *token.Token {
+	return p.step(cli, tokens, 1)
 }
 
-func desc(cli *model.Client, tokens ...*token.Token) *token.Token {
-	return step(cli, tokens, -1)
+func (p *Processor) desc(cli *model.Client, tokens ...*token.Token) *token.Token {
+	return p.step(cli, tokens, -1)
 }
 
-func multi(cli *model.Client, _ ...*token.Token) *token.Token {
+func (p *Processor) multi(cli *model.Client, _ ...*token.Token) *token.Token {
 	if cli.Multi.State {
 		return token.NewError("multi calls can not be nested")
 	}
@@ -134,7 +188,7 @@ func multi(cli *model.Client, _ ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func exec(cli *model.Client, _ ...*token.Token) *token.Token {
+func (p *Processor) exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	if !cli.Multi.State {
 		return token.NewError("exec without multi")
 	}
@@ -142,7 +196,7 @@ func exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	cli.Multi.State = false
 	if !cli.Multi.Dirty {
 		for _, t := range cli.Multi.Queue {
-			rsp := Process(cli, t)
+			rsp := p.Exec(cli, t)
 			responses = append(responses, rsp)
 		}
 	}
@@ -151,7 +205,7 @@ func exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	return token.NewArray(responses...)
 }
 
-func discard(cli *model.Client, _ ...*token.Token) *token.Token {
+func (p *Processor) discard(cli *model.Client, _ ...*token.Token) *token.Token {
 	if !cli.Multi.State {
 		return token.NewError("discard calls without multi")
 	}
@@ -161,7 +215,7 @@ func discard(cli *model.Client, _ ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func watch(cli *model.Client, tokens ...*token.Token) *token.Token {
+func (p *Processor) watch(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
@@ -175,64 +229,19 @@ func watch(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
-func unwatch(cli *model.Client, tokens ...*token.Token) *token.Token {
+func (p *Processor) unwatch(cli *model.Client, _ ...*token.Token) *token.Token {
 	cli.Unwatch()
 	return token.ReplyOk
 }
 
 // select
-func sel(cli *model.Client, tokens ...*token.Token) *token.Token {
+func (p *Processor) sel(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if len(tokens) < 1 {
 		return token.NewError(eStrArgMore)
 	}
 	if err := checkType(tokens[0], "index", label.Integer); err != nil {
 		return token.NewError(err.Error())
 	}
-	cli.DataIdx = int(tokens[0].Data.(int64))
+	cli.Data = p.Data[int(tokens[0].Data.(int64))]
 	return token.ReplyOk
-}
-
-// Process returns result of parsing request command and arguments
-func Process(cli *model.Client, req *token.Token) *token.Token {
-	if req == nil {
-		return token.NewError("empty request")
-	}
-	data, ok := req.Data.([]*token.Token)
-	if !ok || len(data) == 0 {
-		return token.NewError("empty token")
-	}
-	cmd, args := data[0], data[1:]
-	if cli.Multi.State {
-		switch cmd.Data.(string) {
-		case CmdDiscard, CmdExec, CmdMulti, CmdWatch:
-		default:
-			cli.Multi.Queue = append(cli.Multi.Queue, req)
-			return token.ReplyQueued
-		}
-	}
-	switch cmd.Data.(string) {
-	case CmdDesc:
-		return desc(cli, args...)
-	case CmdDiscard:
-		return discard(cli, args...)
-	case CmdExec:
-		return exec(cli, args...)
-	case CmdGet:
-		return get(cli, args...)
-	case CmdIncr:
-		return incr(cli, args...)
-	case CmdMulti:
-		return multi(cli, args...)
-	case CmdPing:
-		return ping(cli, args...)
-	case CmdSelect:
-		return sel(cli, args...)
-	case CmdSet:
-		return set(cli, args...)
-	case CmdWatch:
-		return watch(cli, args...)
-	case CmdUnwatch:
-		return unwatch(cli, args...)
-	}
-	return token.NewError("unrecognized command")
 }

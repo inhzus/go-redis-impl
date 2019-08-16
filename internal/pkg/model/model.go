@@ -36,13 +36,18 @@ func (i *Item) fix(row interface{}, ttl time.Duration) {
 	i.row = row
 }
 
-type dataStorage struct {
+// DataStorage stores key-value data, expiration control heap, watched key-client map
+type DataStorage struct {
 	data  map[string]*Item
 	queue *priorityQueue
 	watch watchMap
 }
 
-func (d *dataStorage) scanPop(n int) {
+func NewDataStorage() *DataStorage {
+	return &DataStorage{make(map[string]*Item), &priorityQueue{}, newWatchMap()}
+}
+
+func (d *DataStorage) scanPop(n int) {
 	now := time.Now().UnixNano()
 	for i := 0; i < checkExpireNum; i++ {
 		top := d.queue.Top()
@@ -58,7 +63,7 @@ func (d *dataStorage) scanPop(n int) {
 	}
 }
 
-func (d *dataStorage) Get(key string) interface{} {
+func (d *DataStorage) Get(key string) interface{} {
 	d.scanPop(checkExpireNum)
 	r, ok := d.data[key]
 	if !ok {
@@ -70,7 +75,7 @@ func (d *dataStorage) Get(key string) interface{} {
 	return r.row
 }
 
-func (d *dataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
+func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
 	d.scanPop(checkExpireNum)
 	item, ok := d.data[key]
 	if ok {
@@ -84,16 +89,4 @@ func (d *dataStorage) Set(key string, value interface{}, ttl time.Duration) inte
 		d.data[key] = item
 	}
 	return item.row
-}
-
-var (
-	data []*dataStorage
-)
-
-// Init initializes data
-func Init(n int) {
-	data = make([]*dataStorage, n)
-	for i := 0; i < n; i++ {
-		data[i] = &dataStorage{make(map[string]*Item), &priorityQueue{}, newWatchMap()}
-	}
 }

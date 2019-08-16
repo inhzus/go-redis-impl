@@ -10,24 +10,41 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
-type Task struct {
+// Task is required to connect between handler & consumer
+type Task interface {
+	Task() Task
+}
+
+type InternalTask struct {
+	Cmd     string
+	DataIdx int
+}
+
+type CommandTask struct {
 	Cli *model.Client
 	Req *token.Token
 	Rsp chan *token.Token
 }
 
+func (t *InternalTask) Task() Task { return t }
+func (t *CommandTask) Task() Task  { return t }
+
+// Option stores server configuration
 type Option struct {
 	Proto   string
 	Addr    string
 	DBCount int
 }
 
+// Server stores option, task queue & stop signal
 type Server struct {
 	option *Option
-	queue  chan *Task
+	queue  chan Task
 	stop   chan struct{}
+	proc   *command.Processor
 }
 
+// NewServer returns a new server pointer with default config
 func NewServer(option *Option) *Server {
 	if option.Proto == "" {
 		option.Proto = "tcp"
@@ -43,23 +60,9 @@ func NewServer(option *Option) *Server {
 	return &Server{option: option}
 }
 
-func (s *Server) submit(t *token.Token, conn net.Conn) *token.Token {
-	if t == nil {
-		return token.NewError("empty request")
-	}
-	data := t.Data.([]*token.Token)
-	if len(data) == 0 {
-		return token.NewError("empty token")
-	}
-	c := make(chan *token.Token)
-	s.queue <- &Task{Req: t, Rsp: c}
-	reply := <-c
-	return reply
-}
-
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := model.NewClient(conn)
+	cli := model.NewClient(conn, s.proc.Data[0])
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
@@ -73,12 +76,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
-			s.queue <- &Task{Cli: cli, Req: req, Rsp: c}
+			s.queue <- &CommandTask{Cli: cli, Req: req, Rsp: c}
 			reply := <-c
 			rsp, err := reply.Serialize()
 			if err != nil {
 				glog.Error(err)
-				rsp, _ = token.ErrorDefault.Serialize()
+				rsp, _ = token.NewError(err.Error()).Serialize()
 			}
 			data = append(data, rsp...)
 		}
@@ -91,13 +94,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 }
 
+// Serve starts handle connections synchronously
 func (s *Server) Serve() error {
-	model.Init(s.option.DBCount)
+	s.proc = command.NewProcessor(s.option.DBCount)
 	listener, err := net.Listen(s.option.Proto, s.option.Addr)
 	if err != nil {
 		return err
 	}
-	s.queue = make(chan *Task)
+	s.queue = make(chan Task)
 	s.stop = make(chan struct{})
 
 	go func() {
@@ -108,8 +112,13 @@ func (s *Server) Serve() error {
 				glog.Infof("server closed")
 				s.stop <- struct{}{}
 				return
-			case t := <-s.queue:
-				t.Rsp <- command.Process(t.Cli, t.Req)
+			case task := <-s.queue:
+				switch t := task.(type) {
+				case *CommandTask:
+					t.Rsp <- s.proc.Exec(t.Cli, t.Req)
+				case *InternalTask:
+					glog.Infof("command: %s on data_%d", t.Cmd, t.DataIdx)
+				}
 			}
 		}
 	}()
@@ -123,6 +132,7 @@ func (s *Server) Serve() error {
 	}
 }
 
+// Close stops server
 func (s *Server) Close() {
 	s.stop <- struct{}{}
 	<-s.stop
