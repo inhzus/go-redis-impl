@@ -353,6 +353,12 @@ func TestProcessor_sel(t *testing.T) {
 }
 
 func TestProcessor_Exec(t *testing.T) {
+	assert.Equal(t, token.NewError("empty request"),
+		proc.Exec(cli, nil))
+	assert.Equal(t, token.NewError("empty token"),
+		proc.Exec(cli, token.NewArray()))
+	assert.Equal(t, token.NewError("type of command is bulked instead of string"),
+		proc.Exec(cli, token.NewArray(token.NewBulked([]byte(CmdGet)))))
 	assert.Equal(t, token.NewString(strPong),
 		proc.Exec(cli, token.NewArray(token.NewString(CmdPing))))
 	assert.Equal(t, token.NewInteger(-1),

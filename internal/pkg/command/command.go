@@ -143,10 +143,7 @@ func (p *Processor) get(cli *model.Client, tokens ...*token.Token) *token.Token 
 		return token.NewError(err.Error())
 	}
 	val := cli.Get(key.Data.(string))
-	data, err := ItfToBulked(val)
-	if err != nil {
-		return token.NewError(err.Error())
-	}
+	data, _ := ItfToBulked(val)
 	return token.NewBulked(data)
 }
 
