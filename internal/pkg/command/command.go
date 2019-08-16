@@ -16,6 +16,7 @@ const (
 	CmdGet     = "get"
 	CmdIncr    = "incr"
 	CmdMulti   = "multi"
+	CmdSelect  = "select"
 	CmdSet     = "set"
 	CmdPing    = "ping"
 	CmdUnwatch = "unwatch"
@@ -167,6 +168,9 @@ func watch(cli *model.Client, tokens ...*token.Token) *token.Token {
 	if cli.Multi.State {
 		return token.NewError("watch inside multi is not allowed")
 	}
+	if err := checkKeyType(tokens[0]); err != nil {
+		return token.NewError(err.Error())
+	}
 	cli.Watch(tokens[0].Data.(string))
 	return token.ReplyOk
 }
@@ -176,9 +180,27 @@ func unwatch(cli *model.Client, tokens ...*token.Token) *token.Token {
 	return token.ReplyOk
 }
 
+// select
+func sel(cli *model.Client, tokens ...*token.Token) *token.Token {
+	if len(tokens) < 1 {
+		return token.NewError(eStrArgMore)
+	}
+	if err := checkType(tokens[0], "index", label.Integer); err != nil {
+		return token.NewError(err.Error())
+	}
+	cli.DataIdx = int(tokens[0].Data.(int64))
+	return token.ReplyOk
+}
+
 // Process returns result of parsing request command and arguments
 func Process(cli *model.Client, req *token.Token) *token.Token {
-	data := req.Data.([]*token.Token)
+	if req == nil {
+		return token.NewError("empty request")
+	}
+	data, ok := req.Data.([]*token.Token)
+	if !ok || len(data) == 0 {
+		return token.NewError("empty token")
+	}
 	cmd, args := data[0], data[1:]
 	if cli.Multi.State {
 		switch cmd.Data.(string) {
@@ -203,6 +225,8 @@ func Process(cli *model.Client, req *token.Token) *token.Token {
 		return multi(cli, args...)
 	case CmdPing:
 		return ping(cli, args...)
+	case CmdSelect:
+		return sel(cli, args...)
 	case CmdSet:
 		return set(cli, args...)
 	case CmdWatch:

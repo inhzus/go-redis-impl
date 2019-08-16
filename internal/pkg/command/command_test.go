@@ -275,6 +275,8 @@ func Test_watch(t *testing.T) {
 	key := "t_watch"
 	assert.Equal(t, token.NewError(eStrArgMore),
 		Process(cli, token.NewArray(token.NewString(CmdWatch))))
+	assert.Equal(t, token.NewError("type of key is bulked instead of string"),
+		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewBulked([]byte(key)))))
 	assert.Equal(t, token.ReplyOk,
 		Process(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
@@ -338,6 +340,18 @@ func Test_unwatch(t *testing.T) {
 		Process(cli, token.NewArray(token.NewString(CmdExec))))
 }
 
+func Test_sel(t *testing.T) {
+	key := "t_sel"
+	c := model.NewClient(nil)
+	assert.Equal(t, token.NewError(eStrArgMore), sel(cli))
+	assert.Equal(t, token.NewError("type of index is string instead of integer"), sel(cli, token.NewString("1")))
+	assert.Equal(t, token.ReplyOk, sel(cli, token.NewInteger(1)))
+	assert.Equal(t, token.ReplyOk, set(cli, token.NewString(key), token.NewString("value")))
+	assert.Equal(t, token.NewBulked(nil), get(c, token.NewString(key)))
+	assert.Equal(t, token.ReplyOk, sel(c, token.NewInteger(1)))
+	assert.Equal(t, token.NewBulked([]byte("value")), get(c, token.NewString(key)))
+}
+
 func TestProcess(t *testing.T) {
 	assert.Equal(t, token.NewString(strPong),
 		Process(cli, token.NewArray(token.NewString(CmdPing))))
@@ -345,6 +359,9 @@ func TestProcess(t *testing.T) {
 		Process(cli, token.NewArray(token.NewString(CmdDesc), token.NewString("t_process"))))
 	assert.Equal(t, token.NewInteger(0),
 		Process(cli, token.NewArray(token.NewString(CmdIncr), token.NewString("t_process"))))
+	assert.Equal(t, token.ReplyOk,
+		Process(cli, token.NewArray(token.NewString(CmdSelect), token.NewInteger(2))))
+	assert.Equal(t, 2, cli.DataIdx)
 	assert.Equal(t, token.NewError("unrecognized command"),
 		Process(cli, token.NewArray(token.NewString("unknown command"))))
 }
