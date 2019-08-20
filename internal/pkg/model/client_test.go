@@ -112,7 +112,25 @@ func TestClient_Set(t *testing.T) {
 	}
 }
 
+func TestClient(t *testing.T) {
+	data.freeze()
+	TestClient_Set(t)
+	assert.Equal(t, 20, len(data.queue.items))
+	assert.Equal(t, 0, len(data.oldQueue.items))
+	assert.Equal(t, 20, len(data.data))
+	assert.Equal(t, 0, len(data.oldData))
+	TestClient_Get(t)
+	assert.Equal(t, 20, len(data.queue.items))
+	assert.Equal(t, 0, len(data.oldQueue.items))
+	assert.Equal(t, 20, len(data.data))
+	assert.Equal(t, 0, len(data.oldData))
+	data.toMove()
+	TestClient_Get(t)
+	TestClient_Set(t)
+}
+
 func TestClient_Get(t *testing.T) {
+	assert.Equal(t, len(data.data), data.queue.Len())
 	KeyFmt := "a_%d"
 	for i := 0; i < 20; i++ {
 		cli.Set(fmt.Sprintf(KeyFmt, i), i, 0)
@@ -122,11 +140,56 @@ func TestClient_Get(t *testing.T) {
 		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
 	}
 	<-time.After(time.Millisecond)
-	assert.Equal(t, cli.Get("a_13"), nil)
+	assert.Equal(t, len(data.data), data.queue.Len())
 	for i := 0; i < 20; i++ {
 		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
 	}
 	<-time.After(time.Millisecond)
 	cli.Set("a_15", 15, 0)
 	assert.Equal(t, cli.Get("a_15"), 15)
+}
+
+func TestClient_Get_Extra(t *testing.T) {
+	cli.Set("g0", 20, 0)
+	data.freeze()
+	assert.Equal(t, 20, cli.Get("g0"))
+	cli.Del("g0")
+}
+
+func TestClient_Set_Extra(t *testing.T) {
+	keyFmt := "s_%d"
+	data.freeze()
+	for i := 0; i < 20; i++ {
+		cli.Set(fmt.Sprintf(keyFmt, i), 1, time.Millisecond)
+	}
+	data.toMove()
+	//assert.Equal(t, 1, cli.Get("s_15"))
+	cli.Set("s_19", 2, time.Millisecond)
+	assert.Equal(t, 2, cli.Get("s_19"))
+
+}
+
+func TestClient_Del(t *testing.T) {
+	key1 := "k_del1"
+	key2 := "k_del2"
+	key3 := "k_del3"
+	cli.Set(key1, 1, 0)
+	cli.Del(key1)
+	assert.Equal(t, nil, cli.Get(key1))
+	cli.Set(key1, 1, 0)
+	cli.Set(key2, 2, 0)
+	cli.Set(key3, 4, 0)
+	data.freeze()
+	cli.Set(key1, 3, 0)
+	<-time.After(time.Millisecond)
+	cli.Del(key1)
+	assert.Equal(t, nil, cli.Get(key1))
+	cli.Del(key2)
+	assert.Equal(t, nil, cli.Get(key2))
+	data.toMove()
+	cli.Del(key1)
+	assert.Equal(t, nil, cli.Get(key1))
+	assert.Equal(t, 4, cli.Get(key3))
+	cli.Del(key3)
+	assert.Equal(t, nil, cli.Get(key3))
 }

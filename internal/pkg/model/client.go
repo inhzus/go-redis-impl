@@ -62,3 +62,7 @@ func (c *Client) Set(key string, value interface{}, ttl time.Duration) interface
 	c.Data.watch.Touch(key)
 	return c.Data.Set(key, value, ttl)
 }
+
+func (c *Client) Del(key string) {
+	c.Data.Del(key)
+}
