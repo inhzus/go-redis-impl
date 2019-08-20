@@ -2,7 +2,6 @@ package model
 
 import (
 	"container/heap"
-	"container/list"
 	"time"
 )
 
@@ -17,7 +16,6 @@ type Item struct {
 	row    interface{}
 	expire int64
 	index  int
-	elem   *list.Element
 }
 
 func newItem(key string, row interface{}, ttl time.Duration) *Item {
@@ -28,8 +26,11 @@ func newItem(key string, row interface{}, ttl time.Duration) *Item {
 	return item
 }
 
+// newExpiredItem returns a new item that is expired.
+// The function is used when origin data is blocked.
+// The item taking the place ensures that origin item is set expired after moving.
 func newExpiredItem(key string) *Item {
-	return &Item{key: key, expire: time.Now().UnixNano()}
+	return &Item{key: key, expire: time.Now().UnixNano() - 1}
 }
 
 func (i *Item) fix(row interface{}, ttl time.Duration) {
@@ -42,7 +43,7 @@ func (i *Item) fix(row interface{}, ttl time.Duration) {
 }
 
 func (i *Item) makeExpired() {
-	i.expire = time.Now().UnixNano()
+	i.expire = time.Now().UnixNano() - 1
 }
 
 // DataStorage stores key-value data, expiration control heap, watched key-client map
@@ -52,6 +53,8 @@ type DataStorage struct {
 	queue    *priorityQueue
 	oldQueue *priorityQueue
 	watch    watchMap
+	// blocked data has two status, status block means origin data should not change,
+	// status moving means moving new data back to origin data
 	isMoving bool
 	isBlock  bool
 }
@@ -74,12 +77,15 @@ func (d *DataStorage) toMove() {
 	d.isMoving = true
 }
 
+// scanPop checks and pops n * expired items when called.
 func (d *DataStorage) scanPop(n int) {
+	// When origin data blocked, expired item should be kept to set origin item expired when moving.
 	if d.isBlock {
 		return
 	}
 	queue := d.queue
 	data := d.data
+	// When moving, origin data is able to check expired again.
 	if d.isMoving {
 		queue = d.oldQueue
 		data = d.oldData
@@ -99,6 +105,7 @@ func (d *DataStorage) scanPop(n int) {
 	}
 }
 
+// moveBack moves n item from new data to origin data when called
 func (d *DataStorage) moveBack(n int) {
 	for i := 0; i < n && d.queue.Len() > 0; i++ {
 		top := d.queue.Top()
@@ -109,6 +116,7 @@ func (d *DataStorage) moveBack(n int) {
 	}
 }
 
+// resetIfMoved checks whether status moving is finished and resets the data
 func (d *DataStorage) resetIfMoved() bool {
 	if !d.isMoving {
 		return true
@@ -122,9 +130,11 @@ func (d *DataStorage) resetIfMoved() bool {
 	return true
 }
 
+// Get returns the value of correspond key
 func (d *DataStorage) Get(key string) interface{} {
 	d.scanPop(checkExpireNum)
 	r, ok := d.data[key]
+	// when blocked or moving, both data should be checked
 	if !ok && (d.isBlock || d.isMoving) {
 		r, ok = d.oldData[key]
 	}
@@ -138,12 +148,14 @@ func (d *DataStorage) Get(key string) interface{} {
 	return r.row
 }
 
+// Set puts the new value of key
 func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
 	d.scanPop(checkExpireNum)
 	data := d.data
 	queue := d.queue
 	if !d.resetIfMoved() {
 		d.moveBack(moveBackNum)
+		// When moving, set data into origin data and delete the one in new data.
 		item, ok := d.data[key]
 		if ok {
 			heap.Remove(d.queue, item.index)
@@ -165,8 +177,10 @@ func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) inte
 	return item.row
 }
 
+// Del deletes the value of correspond key
 func (d *DataStorage) Del(key string) {
 	item, ok := d.data[key]
+	// When blocked, origin data shouldn't be changed, just set item of correspond key in new data expired
 	if d.isBlock {
 		if ok {
 			item.makeExpired()
@@ -182,6 +196,7 @@ func (d *DataStorage) Del(key string) {
 		heap.Remove(d.queue, item.index)
 		delete(d.data, key)
 	}
+	// When moving, both data in origin data & new data should be deleted
 	if d.isMoving {
 		item, ok = d.oldData[key]
 		if ok {

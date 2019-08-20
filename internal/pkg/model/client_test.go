@@ -181,7 +181,6 @@ func TestClient_Del(t *testing.T) {
 	cli.Set(key3, 4, 0)
 	data.freeze()
 	cli.Set(key1, 3, 0)
-	<-time.After(time.Millisecond)
 	cli.Del(key1)
 	assert.Equal(t, nil, cli.Get(key1))
 	cli.Del(key2)
