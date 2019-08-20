@@ -2,6 +2,7 @@ package model
 
 import (
 	"container/heap"
+	"fmt"
 	"time"
 )
 
@@ -12,38 +13,34 @@ const (
 
 // Item is key-value pair stored in model
 type Item struct {
-	key    string
-	row    interface{}
-	expire int64
+	Key    string
+	Row    interface{}
+	Expire int64
 	index  int
 }
 
-func newItem(key string, row interface{}, ttl time.Duration) *Item {
-	item := &Item{key: key, row: row}
-	if ttl > 0 {
-		item.expire = time.Now().Add(ttl).UnixNano()
-	}
-	return item
+func newItem(key string, row interface{}, expire int64) *Item {
+	return &Item{Key: key, Row: row, Expire: expire}
 }
 
 // newExpiredItem returns a new item that is expired.
 // The function is used when origin data is blocked.
 // The item taking the place ensures that origin item is set expired after moving.
 func newExpiredItem(key string) *Item {
-	return &Item{key: key, expire: time.Now().UnixNano() - 1}
+	return &Item{Key: key, Expire: time.Now().UnixNano() - 1}
 }
 
-func (i *Item) fix(row interface{}, ttl time.Duration) {
-	if ttl == 0 && i.expire < time.Now().UnixNano() {
-		i.expire = 0
-	} else if ttl > 0 {
-		i.expire = time.Now().Add(ttl).UnixNano()
+func (i *Item) fix(row interface{}, expire int64) {
+	if expire == 0 && i.Expire < time.Now().UnixNano() {
+		i.Expire = 0
+	} else if expire > 0 {
+		i.Expire = expire
 	}
-	i.row = row
+	i.Row = row
 }
 
 func (i *Item) makeExpired() {
-	i.expire = time.Now().UnixNano() - 1
+	i.Expire = time.Now().UnixNano() - 1
 }
 
 // DataStorage stores key-value data, expiration control heap, watched key-client map
@@ -64,17 +61,31 @@ func NewDataStorage() *DataStorage {
 	return &DataStorage{data: make(map[string]*Item), queue: &priorityQueue{}, watch: newWatchMap()}
 }
 
-func (d *DataStorage) freeze() {
+func (d *DataStorage) GetData() map[string]*Item {
+	return d.data
+}
+
+// Freeze and following logic ensure the origin data won't change until "ToMove"
+func (d *DataStorage) Freeze() error {
+	if d.isMoving {
+		return fmt.Errorf("data is moving")
+	}
 	d.isBlock = true
 	d.oldData = d.data
 	d.data = make(map[string]*Item)
 	d.oldQueue = d.queue
 	d.queue = &priorityQueue{}
+	return nil
 }
 
-func (d *DataStorage) toMove() {
+// ToMove notifies data storage to move items from new data to old data
+func (d *DataStorage) ToMove() error {
+	if !d.isBlock {
+		return fmt.Errorf("data was not blocked")
+	}
 	d.isBlock = false
 	d.isMoving = true
+	return nil
 }
 
 // scanPop checks and pops n * expired items when called.
@@ -96,9 +107,9 @@ func (d *DataStorage) scanPop(n int) {
 		if top == nil {
 			return
 		}
-		if top.expire > 0 && top.expire < now {
+		if top.Expire > 0 && top.Expire < now {
 			heap.Pop(queue)
-			delete(data, top.key)
+			delete(data, top.Key)
 		} else {
 			return
 		}
@@ -110,8 +121,8 @@ func (d *DataStorage) moveBack(n int) {
 	for i := 0; i < n && d.queue.Len() > 0; i++ {
 		top := d.queue.Top()
 		heap.Pop(d.queue)
-		delete(d.data, top.key)
-		d.oldData[top.key] = top
+		delete(d.data, top.Key)
+		d.oldData[top.Key] = top
 		heap.Push(d.oldQueue, top)
 	}
 }
@@ -133,6 +144,9 @@ func (d *DataStorage) resetIfMoved() bool {
 // Get returns the value of correspond key
 func (d *DataStorage) Get(key string) interface{} {
 	d.scanPop(checkExpireNum)
+	if !d.resetIfMoved() {
+		d.moveBack(moveBackNum)
+	}
 	r, ok := d.data[key]
 	// when blocked or moving, both data should be checked
 	if !ok && (d.isBlock || d.isMoving) {
@@ -142,14 +156,14 @@ func (d *DataStorage) Get(key string) interface{} {
 		return nil
 	}
 	now := time.Now().UnixNano()
-	if r.expire > 0 && r.expire < now {
+	if r.Expire > 0 && r.Expire < now {
 		return nil
 	}
-	return r.row
+	return r.Row
 }
 
 // Set puts the new value of key
-func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) interface{} {
+func (d *DataStorage) Set(key string, value interface{}, expire int64) interface{} {
 	d.scanPop(checkExpireNum)
 	data := d.data
 	queue := d.queue
@@ -167,14 +181,14 @@ func (d *DataStorage) Set(key string, value interface{}, ttl time.Duration) inte
 
 	item, ok := data[key]
 	if ok {
-		item.fix(value, ttl)
+		item.fix(value, expire)
 		heap.Fix(queue, item.index)
 	} else {
-		item = newItem(key, value, ttl)
+		item = newItem(key, value, expire)
 		data[key] = item
 		heap.Push(queue, item)
 	}
-	return item.row
+	return item.Row
 }
 
 // Del deletes the value of correspond key

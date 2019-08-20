@@ -79,22 +79,22 @@ func TestClient_Watch(t *testing.T) {
 		assert.Nil(t, cs[i].Multi.Watched)
 	}
 	assert.Zero(t, len(data.watch))
-	cli.Set("10", 1, time.Nanosecond)
-	cli.Set("1", 1, time.Nanosecond)
+	cli.Set("10", 1, time.Now().Add(time.Nanosecond).UnixNano())
+	cli.Set("1", 1, time.Now().Add(time.Nanosecond).UnixNano())
 	<-time.After(time.Millisecond)
 }
 
 func TestClient_Set(t *testing.T) {
 	KeyFmt := "a_%d"
 	for i := 0; i < 20; i++ {
-		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Second)
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Now().Add(time.Second).UnixNano())
 	}
 	for i := 0; i < 20; i++ {
 		val := cli.Get(fmt.Sprintf(KeyFmt, i))
 		assert.Equal(t, val.(int), i)
 	}
 	for i := 0; i < 10; i++ {
-		cli.Set(fmt.Sprintf(KeyFmt, i), i+1, time.Second/2)
+		cli.Set(fmt.Sprintf(KeyFmt, i), i+1, time.Now().Add(time.Second/2).UnixNano())
 	}
 	for i := 0; i < 10; i++ {
 		val := cli.Get(fmt.Sprintf(KeyFmt, i))
@@ -113,7 +113,7 @@ func TestClient_Set(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	data.freeze()
+	_ = data.Freeze()
 	TestClient_Set(t)
 	assert.Equal(t, 20, len(data.queue.items))
 	assert.Equal(t, 0, len(data.oldQueue.items))
@@ -124,7 +124,7 @@ func TestClient(t *testing.T) {
 	assert.Equal(t, 0, len(data.oldQueue.items))
 	assert.Equal(t, 20, len(data.data))
 	assert.Equal(t, 0, len(data.oldData))
-	data.toMove()
+	_ = data.ToMove()
 	TestClient_Get(t)
 	TestClient_Set(t)
 }
@@ -137,12 +137,12 @@ func TestClient_Get(t *testing.T) {
 	}
 	assert.Equal(t, cli.Get("a_15"), 15)
 	for i := 0; i < 20; i++ {
-		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Now().Add(time.Millisecond).UnixNano())
 	}
 	<-time.After(time.Millisecond)
 	assert.Equal(t, len(data.data), data.queue.Len())
 	for i := 0; i < 20; i++ {
-		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Millisecond)
+		cli.Set(fmt.Sprintf(KeyFmt, i), i, time.Now().Add(time.Millisecond).UnixNano())
 	}
 	<-time.After(time.Millisecond)
 	cli.Set("a_15", 15, 0)
@@ -151,20 +151,20 @@ func TestClient_Get(t *testing.T) {
 
 func TestClient_Get_Extra(t *testing.T) {
 	cli.Set("g0", 20, 0)
-	data.freeze()
+	_ = data.Freeze()
 	assert.Equal(t, 20, cli.Get("g0"))
 	cli.Del("g0")
 }
 
 func TestClient_Set_Extra(t *testing.T) {
 	keyFmt := "s_%d"
-	data.freeze()
+	_ = data.Freeze()
 	for i := 0; i < 20; i++ {
-		cli.Set(fmt.Sprintf(keyFmt, i), 1, time.Millisecond)
+		cli.Set(fmt.Sprintf(keyFmt, i), 1, time.Now().Add(time.Millisecond).UnixNano())
 	}
-	data.toMove()
+	_ = data.ToMove()
 	//assert.Equal(t, 1, cli.Get("s_15"))
-	cli.Set("s_19", 2, time.Millisecond)
+	cli.Set("s_19", 2, time.Now().Add(time.Millisecond).UnixNano())
 	assert.Equal(t, 2, cli.Get("s_19"))
 
 }
@@ -179,13 +179,13 @@ func TestClient_Del(t *testing.T) {
 	cli.Set(key1, 1, 0)
 	cli.Set(key2, 2, 0)
 	cli.Set(key3, 4, 0)
-	data.freeze()
+	_ = data.Freeze()
 	cli.Set(key1, 3, 0)
 	cli.Del(key1)
 	assert.Equal(t, nil, cli.Get(key1))
 	cli.Del(key2)
 	assert.Equal(t, nil, cli.Get(key2))
-	data.toMove()
+	_ = data.ToMove()
 	cli.Del(key1)
 	assert.Equal(t, nil, cli.Get(key1))
 	assert.Equal(t, 4, cli.Get(key3))

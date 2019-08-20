@@ -2,7 +2,6 @@ package model
 
 import (
 	"net"
-	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
@@ -11,7 +10,7 @@ import (
 type MultiInfo struct {
 	// true if transaction started
 	State bool
-	// true if watched key is changed
+	// true if watched Key is changed
 	Dirty bool
 	// transaction queue
 	Queue []*token.Token
@@ -33,7 +32,7 @@ func NewClient(conn net.Conn, dataStorage *DataStorage) *Client {
 	return &Client{Conn: conn, Data: dataStorage, Multi: &MultiInfo{}}
 }
 
-// Watch append key to self watch list and append self to global watch map
+// Watch append Key to self watch list and append self to global watch map
 func (c *Client) Watch(key string) {
 	for _, v := range c.Multi.Watched {
 		if v.wc.key == key {
@@ -52,17 +51,18 @@ func (c *Client) Unwatch() {
 	c.Multi.Dirty = false
 }
 
-// Get returns correspond value of data indexed and key
+// Get returns correspond value of data indexed and Key
 func (c *Client) Get(key string) interface{} {
 	return c.Data.Get(key)
 }
 
-// Set puts key-value pair and its ttl in data
-func (c *Client) Set(key string, value interface{}, ttl time.Duration) interface{} {
+// Set puts Key-value pair and its ttl in data
+func (c *Client) Set(key string, value interface{}, expire int64) interface{} {
 	c.Data.watch.Touch(key)
-	return c.Data.Set(key, value, ttl)
+	return c.Data.Set(key, value, expire)
 }
 
+// Del deletes the value of correspond Key
 func (c *Client) Del(key string) {
 	c.Data.Del(key)
 }

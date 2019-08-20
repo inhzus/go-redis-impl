@@ -13,6 +13,7 @@ type Task interface {
 type ModTask struct {
 	Cmd     string
 	DataIdx int
+	Rsp     chan error
 }
 
 type CmdTask struct {

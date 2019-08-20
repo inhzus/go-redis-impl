@@ -5,8 +5,8 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-	"github.com/inhzus/go-redis-impl/internal/pkg/proc"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
+	"github.com/inhzus/go-redis-impl/internal/pkg/proc"
 	"github.com/inhzus/go-redis-impl/internal/pkg/task"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
@@ -44,7 +44,7 @@ func NewServer(option *Option) *Server {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := model.NewClient(conn, s.proc.GetDefaultData())
+	cli := model.NewClient(conn, s.proc.GetData(0))
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {

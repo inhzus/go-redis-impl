@@ -3,6 +3,7 @@ package proc
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
@@ -89,6 +90,11 @@ func TestProcessor_set(t *testing.T) {
 			}
 		})
 	}
+	proc.set(cli, token.NewString("a"), token.NewInteger(4),
+		token.NewString("PT"), token.NewInteger(time.Now().Add(time.Millisecond).UnixNano()))
+	assert.Equal(t, []byte("4"), proc.get(cli, token.NewString("a")).Data)
+	<-time.After(time.Millisecond)
+	assert.Equal(t, nil, proc.get(cli, token.NewString("a")).Data)
 }
 
 func TestProcessor_get(t *testing.T) {

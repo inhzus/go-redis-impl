@@ -1,6 +1,7 @@
 package proc
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
@@ -24,12 +25,14 @@ const (
 	CmdWatch   = "watch"
 
 	ModFreeze = "freeze"
+	ModMove   = "move"
 )
 
 // argument string
 const (
 	TimeoutSec    = "EX"
 	TimeoutMilSec = "PX"
+	ExpireAtNano  = "PT"
 )
 
 const (
@@ -65,6 +68,9 @@ func NewProcessor(n int) *Processor {
 	return p
 }
 
+func (p *Processor) GetData(idx int) *model.DataStorage {
+	return p.data[idx]
+}
 // execCmd returns result of parsing request command and arguments
 func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 	if req == nil {
@@ -92,16 +98,23 @@ func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 	return token.NewError("unrecognized command")
 }
 
+func (p *Processor) execMod(cmd string, index int) error {
+	switch cmd {
+	case ModFreeze:
+		return p.data[index].Freeze()
+	case ModMove:
+		return p.data[index].ToMove()
+	}
+	return fmt.Errorf("unrecognized command")
+}
+
 func (p *Processor) Do(tsk task.Task) {
 	switch t := tsk.(type) {
 	case *task.CmdTask:
 		t.Rsp <- p.execCmd(t.Cli, t.Req)
 	case *task.ModTask:
+		t.Rsp <- p.execMod(t.Cmd, t.DataIdx)
 	}
-}
-
-func (p *Processor) GetDefaultData() *model.DataStorage {
-	return p.data[0]
 }
 
 func (p *Processor) ping(_ *model.Client, _ ...*token.Token) *token.Token {
@@ -119,14 +132,14 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 	if err := checkType(value, "value", label.Bulked, label.Integer, label.String); err != nil {
 		return token.NewError(err.Error())
 	}
-	var timeout time.Duration
+	var expire int64
 	for i := 2; i < len(tokens); i++ {
 		if err := checkType(tokens[i], "argument", label.String); err != nil {
 			return token.NewError(err.Error())
 		}
 		arg := tokens[i].Data.(string)
 		switch arg {
-		case TimeoutMilSec, TimeoutSec:
+		case TimeoutMilSec, TimeoutSec, ExpireAtNano:
 			i++
 			if len(tokens) < i+1 {
 				return token.NewError("argument missing of %s", arg)
@@ -134,18 +147,20 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 			if err := checkType(tokens[i], "timeout", label.Integer); err != nil {
 				return token.NewError(err.Error())
 			}
-			num := time.Duration(tokens[i].Data.(int64))
+			num := tokens[i].Data.(int64)
 			switch arg {
 			case TimeoutSec:
-				timeout = num * time.Second
+				expire = time.Now().Add(time.Duration(num) * time.Second).UnixNano()
 			case TimeoutMilSec:
-				timeout = num * time.Millisecond
+				expire = time.Now().Add(time.Duration(num) * time.Millisecond).UnixNano()
+			case ExpireAtNano:
+				expire = num
 			}
 		default:
 			return token.NewError("argument not recognized")
 		}
 	}
-	cli.Set(key.Data.(string), value.Data, timeout)
+	cli.Set(key.Data.(string), value.Data, expire)
 	return token.ReplyOk
 }
 

@@ -9,13 +9,13 @@ func (q priorityQueue) Len() int {
 }
 
 func (q priorityQueue) Less(i, j int) bool {
-	if q.items[i].expire <= 0 {
+	if q.items[i].Expire <= 0 {
 		return false
 	}
-	if q.items[j].expire <= 0 {
+	if q.items[j].Expire <= 0 {
 		return true
 	}
-	return q.items[i].expire < q.items[j].expire
+	return q.items[i].Expire < q.items[j].Expire
 }
 
 func (q priorityQueue) Swap(i, j int) {
