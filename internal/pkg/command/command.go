@@ -5,6 +5,7 @@ import (
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
+	"github.com/inhzus/go-redis-impl/internal/pkg/task"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -37,7 +38,7 @@ const (
 
 type Processor struct {
 	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
-	Data    []*model.DataStorage
+	data    []*model.DataStorage
 }
 
 func NewProcessor(n int) *Processor {
@@ -55,15 +56,15 @@ func NewProcessor(n int) *Processor {
 		CmdUnwatch: p.unwatch,
 		CmdWatch:   p.watch,
 	}
-	p.Data = make([]*model.DataStorage, n)
+	p.data = make([]*model.DataStorage, n)
 	for i := 0; i < n; i++ {
-		p.Data[i] = model.NewDataStorage()
+		p.data[i] = model.NewDataStorage()
 	}
 	return p
 }
 
-// Exec returns result of parsing request command and arguments
-func (p *Processor) Exec(cli *model.Client, req *token.Token) *token.Token {
+// execCmd returns result of parsing request command and arguments
+func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 	if req == nil {
 		return token.NewError("empty request")
 	}
@@ -87,6 +88,18 @@ func (p *Processor) Exec(cli *model.Client, req *token.Token) *token.Token {
 		return proc(cli, args...)
 	}
 	return token.NewError("unrecognized command")
+}
+
+func (p *Processor) Do(tsk task.Task) {
+	switch t := tsk.(type) {
+	case *task.CmdTask:
+		t.Rsp <- p.execCmd(t.Cli, t.Req)
+	case *task.ModTask:
+	}
+}
+
+func (p *Processor) GetDefaultData() *model.DataStorage {
+	return p.data[0]
 }
 
 func (p *Processor) ping(_ *model.Client, _ ...*token.Token) *token.Token {
@@ -193,7 +206,7 @@ func (p *Processor) exec(cli *model.Client, _ ...*token.Token) *token.Token {
 	cli.Multi.State = false
 	if !cli.Multi.Dirty {
 		for _, t := range cli.Multi.Queue {
-			rsp := p.Exec(cli, t)
+			rsp := p.execCmd(cli, t)
 			responses = append(responses, rsp)
 		}
 	}
@@ -239,6 +252,6 @@ func (p *Processor) sel(cli *model.Client, tokens ...*token.Token) *token.Token 
 	if err := checkType(tokens[0], "index", label.Integer); err != nil {
 		return token.NewError(err.Error())
 	}
-	cli.Data = p.Data[int(tokens[0].Data.(int64))]
+	cli.Data = p.data[int(tokens[0].Data.(int64))]
 	return token.ReplyOk
 }

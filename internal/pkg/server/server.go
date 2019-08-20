@@ -7,27 +7,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/command"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
+	"github.com/inhzus/go-redis-impl/internal/pkg/task"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
-
-// Task is required to connect between handler & consumer
-type Task interface {
-	Task() Task
-}
-
-type InternalTask struct {
-	Cmd     string
-	DataIdx int
-}
-
-type CommandTask struct {
-	Cli *model.Client
-	Req *token.Token
-	Rsp chan *token.Token
-}
-
-func (t *InternalTask) Task() Task { return t }
-func (t *CommandTask) Task() Task  { return t }
 
 // Option stores server configuration
 type Option struct {
@@ -39,7 +21,7 @@ type Option struct {
 // Server stores option, task queue & stop signal
 type Server struct {
 	option *Option
-	queue  chan Task
+	queue  chan task.Task
 	stop   chan struct{}
 	proc   *command.Processor
 }
@@ -62,7 +44,7 @@ func NewServer(option *Option) *Server {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := model.NewClient(conn, s.proc.Data[0])
+	cli := model.NewClient(conn, s.proc.GetDefaultData())
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
@@ -76,7 +58,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
-			s.queue <- &CommandTask{Cli: cli, Req: req, Rsp: c}
+			s.queue <- &task.CmdTask{Cli: cli, Req: req, Rsp: c}
 			reply := <-c
 			rsp, err := reply.Serialize()
 			if err != nil {
@@ -101,7 +83,7 @@ func (s *Server) Serve() error {
 	if err != nil {
 		return err
 	}
-	s.queue = make(chan Task)
+	s.queue = make(chan task.Task)
 	s.stop = make(chan struct{})
 
 	go func() {
@@ -112,13 +94,8 @@ func (s *Server) Serve() error {
 				glog.Infof("server closed")
 				s.stop <- struct{}{}
 				return
-			case task := <-s.queue:
-				switch t := task.(type) {
-				case *CommandTask:
-					t.Rsp <- s.proc.Exec(t.Cli, t.Req)
-				case *InternalTask:
-					glog.Infof("command: %s on data_%d", t.Cmd, t.DataIdx)
-				}
+			case tsk := <-s.queue:
+				s.proc.Do(tsk)
 			}
 		}
 	}()
