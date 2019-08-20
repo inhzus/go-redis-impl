@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-	"github.com/inhzus/go-redis-impl/internal/pkg/command"
+	"github.com/inhzus/go-redis-impl/internal/pkg/proc"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/task"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
@@ -23,7 +23,7 @@ type Server struct {
 	option *Option
 	queue  chan task.Task
 	stop   chan struct{}
-	proc   *command.Processor
+	proc   *proc.Processor
 }
 
 // NewServer returns a new server pointer with default config
@@ -78,7 +78,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 // Serve starts handle connections synchronously
 func (s *Server) Serve() error {
-	s.proc = command.NewProcessor(s.option.DBCount)
+	s.proc = proc.NewProcessor(s.option.DBCount)
 	listener, err := net.Listen(s.option.Proto, s.option.Addr)
 	if err != nil {
 		return err

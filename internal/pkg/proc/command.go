@@ -1,4 +1,4 @@
-package command
+package proc
 
 import (
 	"time"
@@ -9,7 +9,7 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
-// command string
+// proc string
 const (
 	CmdDesc    = "desc"
 	CmdDiscard = "discard"
@@ -22,6 +22,8 @@ const (
 	CmdPing    = "ping"
 	CmdUnwatch = "unwatch"
 	CmdWatch   = "watch"
+
+	ModFreeze = "freeze"
 )
 
 // argument string
