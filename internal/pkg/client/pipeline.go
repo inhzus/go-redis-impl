@@ -33,7 +33,7 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 	if len(responses) == len(p.commands) {
 		for i, item := range responses {
 			p.commands[i].Label = item.Data.Label
-			p.commands[i].Data = item.Data.Label
+			p.commands[i].Data = item.Data.Data
 		}
 		defer func() { p.commands = nil }()
 		return p.commands, nil
