@@ -10,7 +10,7 @@ import (
 type MultiInfo struct {
 	// true if transaction started
 	State bool
-	// true if watched Key is changed
+	// true if watched key is changed
 	Dirty bool
 	// transaction queue
 	Queue []*token.Token
@@ -23,16 +23,17 @@ type Client struct {
 	Conn net.Conn
 	// database index selected
 	Data *DataStorage
+	Idx  int
 	// transaction info
 	Multi *MultiInfo
 }
 
 // NewClient returns a client selecting database 0, transaction state false
-func NewClient(conn net.Conn, dataStorage *DataStorage) *Client {
-	return &Client{Conn: conn, Data: dataStorage, Multi: &MultiInfo{}}
+func NewClient(conn net.Conn, dataStorage *DataStorage, idx int) *Client {
+	return &Client{Conn: conn, Data: dataStorage, Idx: idx, Multi: &MultiInfo{}}
 }
 
-// Watch append Key to self watch list and append self to global watch map
+// Watch append key to self watch list and append self to global watch map
 func (c *Client) Watch(key string) {
 	for _, v := range c.Multi.Watched {
 		if v.wc.key == key {
@@ -51,18 +52,18 @@ func (c *Client) Unwatch() {
 	c.Multi.Dirty = false
 }
 
-// Get returns correspond value of data indexed and Key
+// Get returns correspond value of data indexed and key
 func (c *Client) Get(key string) interface{} {
 	return c.Data.Get(key)
 }
 
-// Set puts Key-value pair and its ttl in data
+// Set puts key-value pair and its ttl in data
 func (c *Client) Set(key string, value interface{}, expire int64) interface{} {
 	c.Data.watch.Touch(key)
 	return c.Data.Set(key, value, expire)
 }
 
-// Del deletes the value of correspond Key
+// Del deletes the value of correspond key
 func (c *Client) Del(key string) {
 	c.Data.Del(key)
 }

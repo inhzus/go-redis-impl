@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
+	"github.com/inhzus/go-redis-impl/internal/pkg/task"
 )
 
 func readUntil(reader *bufio.Reader, seps []byte) (line []byte, err error) {
@@ -89,3 +90,28 @@ func Deserialize(conn net.Conn) ([]*Token, error) {
 	}
 	return ts, nil
 }
+
+func DeserializeGenerator(reader *bufio.Reader) (ch chan *DeSerMsg) {
+	ch = make(chan *DeSerMsg)
+	go func() {
+		defer close(ch)
+		for {
+			t, err := parseItem(reader)
+			ch <- &DeSerMsg{T: t, Err: err}
+			if err != nil {
+				return
+			}
+			if reader.Buffered() <= 0 {
+				return
+			}
+		}
+	}()
+	return
+}
+
+type DeSerMsg struct {
+	T   *Token
+	Err error
+}
+
+func (m *DeSerMsg) Msg() task.Msg { return m }

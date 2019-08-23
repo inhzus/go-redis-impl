@@ -15,9 +15,7 @@ var (
 
 func init() {
 	s := server.NewServer(&server.Option{})
-	go func() {
-		_ = s.Serve()
-	}()
+	go s.Serve()
 	c = NewClient(&Option{})
 	_ = c.Connect()
 }

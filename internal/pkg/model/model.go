@@ -13,21 +13,21 @@ const (
 
 // Item is key-value pair stored in model
 type Item struct {
-	Key    string
+	key    string
 	Row    interface{}
 	Expire int64
 	index  int
 }
 
 func newItem(key string, row interface{}, expire int64) *Item {
-	return &Item{Key: key, Row: row, Expire: expire}
+	return &Item{key: key, Row: row, Expire: expire}
 }
 
 // newExpiredItem returns a new item that is expired.
 // The function is used when origin data is blocked.
 // The item taking the place ensures that origin item is set expired after moving.
 func newExpiredItem(key string) *Item {
-	return &Item{Key: key, Expire: time.Now().UnixNano() - 1}
+	return &Item{key: key, Expire: time.Now().UnixNano() - 1}
 }
 
 func (i *Item) fix(row interface{}, expire int64) {
@@ -61,13 +61,13 @@ func NewDataStorage() *DataStorage {
 	return &DataStorage{data: make(map[string]*Item), queue: &priorityQueue{}, watch: newWatchMap()}
 }
 
-func (d *DataStorage) GetData() map[string]*Item {
-	return d.data
+func (d *DataStorage) GetOrigin() map[string]*Item {
+	return d.oldData
 }
 
 // Freeze and following logic ensure the origin data won't change until "ToMove"
 func (d *DataStorage) Freeze() error {
-	if d.isMoving {
+	if !d.resetIfMoved() {
 		return fmt.Errorf("data is moving")
 	}
 	d.isBlock = true
@@ -109,7 +109,7 @@ func (d *DataStorage) scanPop(n int) {
 		}
 		if top.Expire > 0 && top.Expire < now {
 			heap.Pop(queue)
-			delete(data, top.Key)
+			delete(data, top.key)
 		} else {
 			return
 		}
@@ -121,8 +121,8 @@ func (d *DataStorage) moveBack(n int) {
 	for i := 0; i < n && d.queue.Len() > 0; i++ {
 		top := d.queue.Top()
 		heap.Pop(d.queue)
-		delete(d.data, top.Key)
-		d.oldData[top.Key] = top
+		delete(d.data, top.key)
+		d.oldData[top.key] = top
 		heap.Push(d.oldQueue, top)
 	}
 }

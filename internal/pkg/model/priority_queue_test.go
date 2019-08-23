@@ -42,7 +42,7 @@ func TestPriorityQueueCheckOrder(t *testing.T) {
 	}
 	for i := 1; i <= 10; i++ {
 		item := heap.Pop(queue).(*Item)
-		assert.Equal(t, item.Key, fmt.Sprintf("key_%d", i), "error")
+		assert.Equal(t, item.key, fmt.Sprintf("key_%d", i), "error")
 	}
 }
 
@@ -70,7 +70,7 @@ func TestPriorityQueueRemove(t *testing.T) {
 			break
 		}
 		item := heap.Pop(queue).(*Item)
-		assert.NotEqual(t, itemRemove.Key, item.Key, "This element was not supposed to be in the queue")
+		assert.NotEqual(t, itemRemove.key, item.key, "This element was not supposed to be in the queue")
 	}
 
 	assert.Equal(t, queue.Len(), 0, "The queue is supposed to be with 0 items")
@@ -82,9 +82,9 @@ func TestPriorityQueueUpdate(t *testing.T) {
 	heap.Push(queue, item)
 	assert.Equal(t, queue.Len(), 1, "The queue is supposed to be with 1 item")
 
-	item.Key = "newKey"
+	item.key = "newKey"
 	heap.Fix(queue, item.index)
 	newItem := heap.Pop(queue).(*Item)
-	assert.Equal(t, newItem.Key, "newKey", "The item Key didn't change")
+	assert.Equal(t, newItem.key, "newKey", "The item key didn't change")
 	assert.Equal(t, queue.Len(), 0, "The queue is supposed to be with 0 items")
 }

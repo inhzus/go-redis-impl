@@ -44,9 +44,10 @@ const (
 type Processor struct {
 	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
 	data    []*model.DataStorage
+	setCh   chan<- *model.SetMsg
 }
 
-func NewProcessor(n int) *Processor {
+func NewProcessor(n int, setCh chan<- *model.SetMsg) *Processor {
 	p := &Processor{}
 	p.ctrlMap = map[string]func(*model.Client, ...*token.Token) *token.Token{
 		CmdDesc:    p.desc,
@@ -61,11 +62,29 @@ func NewProcessor(n int) *Processor {
 		CmdUnwatch: p.unwatch,
 		CmdWatch:   p.watch,
 	}
+	p.setCh = setCh
 	p.data = make([]*model.DataStorage, n)
 	for i := 0; i < n; i++ {
 		p.data[i] = model.NewDataStorage()
 	}
 	return p
+}
+
+func (p *Processor) GenBin(idx int, ch chan<- []byte) {
+	defer close(ch)
+	data := p.data[idx].GetOrigin()
+	if len(data) == 0 {
+		return
+	}
+	for k, v := range data {
+		val, _ := ItfToBulked(v.Row)
+		t := token.NewArray(token.NewString(CmdSet), token.NewString(k), token.NewBulked(val))
+		if v.Expire > 0 {
+			t.Data = append(t.Data.([]*token.Token), token.NewString(ExpireAtNano), token.NewInteger(v.Expire))
+		}
+		d, _ := t.Serialize()
+		ch <- d
+	}
 }
 
 func (p *Processor) GetData(idx int) *model.DataStorage {
@@ -110,9 +129,9 @@ func (p *Processor) execMod(cmd string, index int) error {
 
 func (p *Processor) Do(tsk task.Task) {
 	switch t := tsk.(type) {
-	case *task.CmdTask:
+	case *model.CmdTask:
 		t.Rsp <- p.execCmd(t.Cli, t.Req)
-	case *task.ModTask:
+	case *model.ModTask:
 		t.Rsp <- p.execMod(t.Cmd, t.DataIdx)
 	}
 }
@@ -161,6 +180,11 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 		}
 	}
 	cli.Set(key.Data.(string), value.Data, expire)
+	t := token.NewArray(token.NewString(CmdSet), token.NewString(key.Data.(string)), token.NewBulked(value.Data))
+	if expire > 0 {
+		t.Data = append(t.Data.([]*token.Token), token.NewString(ExpireAtNano), token.NewInteger(expire))
+	}
+	p.setCh <- &model.SetMsg{Idx: cli.Idx, T: t}
 	return token.ReplyOk
 }
 
@@ -269,6 +293,8 @@ func (p *Processor) sel(cli *model.Client, tokens ...*token.Token) *token.Token 
 	if err := checkType(tokens[0], "index", label.Integer); err != nil {
 		return token.NewError(err.Error())
 	}
-	cli.Data = p.data[int(tokens[0].Data.(int64))]
+	idx := int(tokens[0].Data.(int64))
+	cli.Idx = idx
+	cli.Data = p.data[idx]
 	return token.ReplyOk
 }

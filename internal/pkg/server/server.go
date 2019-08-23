@@ -3,6 +3,7 @@ package server
 import (
 	"io"
 	"net"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
@@ -13,9 +14,15 @@ import (
 
 // Option stores server configuration
 type Option struct {
-	Proto   string
 	Addr    string
 	DBCount int
+	Persist struct {
+		AppendName string
+		CloneName  string
+		FlushInr   time.Duration
+		RewriteInr time.Duration
+	}
+	Proto string
 }
 
 // Server stores option, task queue & stop signal
@@ -24,6 +31,7 @@ type Server struct {
 	queue  chan task.Task
 	stop   chan struct{}
 	proc   *proc.Processor
+	setCh  chan *model.SetMsg
 }
 
 // NewServer returns a new server pointer with default config
@@ -39,12 +47,24 @@ func NewServer(option *Option) *Server {
 	if option.DBCount == 0 {
 		option.DBCount = 16
 	}
+	if len(option.Persist.AppendName) == 0 {
+		option.Persist.AppendName = "append-only.aof"
+	}
+	if len(option.Persist.CloneName) == 0 {
+		option.Persist.CloneName = "data.rcl"
+	}
+	if option.Persist.FlushInr == 0 {
+		option.Persist.FlushInr = time.Second
+	}
+	if option.Persist.RewriteInr == 0 {
+		option.Persist.RewriteInr = time.Hour
+	}
 	return &Server{option: option}
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := model.NewClient(conn, s.proc.GetData(0))
+	cli := model.NewClient(conn, s.proc.GetData(0), 0)
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
@@ -58,7 +78,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
-			s.queue <- &task.CmdTask{Cli: cli, Req: req, Rsp: c}
+			s.queue <- &model.CmdTask{Cli: cli, Req: req, Rsp: c}
 			reply := <-c
 			rsp, err := reply.Serialize()
 			if err != nil {
@@ -77,15 +97,13 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 // Serve starts handle connections synchronously
-func (s *Server) Serve() error {
-	s.proc = proc.NewProcessor(s.option.DBCount)
+func (s *Server) Serve() {
 	listener, err := net.Listen(s.option.Proto, s.option.Addr)
-	if err != nil {
-		return err
-	}
+	checkErr(err)
 	s.queue = make(chan task.Task)
 	s.stop = make(chan struct{})
-
+	s.setCh = make(chan *model.SetMsg, 2<<10)
+	s.proc = proc.NewProcessor(s.option.DBCount, s.setCh)
 	go func() {
 		for {
 			select {
@@ -99,12 +117,11 @@ func (s *Server) Serve() error {
 			}
 		}
 	}()
-
+	s.restoreData()
+	go s.persistence()
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
-			return err
-		}
+		checkErr(err)
 		go s.handleConnection(conn)
 	}
 }
