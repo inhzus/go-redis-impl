@@ -12,7 +12,7 @@ import (
 )
 
 var data = NewDataStorage()
-var cli = NewClient(nil, data, 0)
+var cli = NewClient(nil, data, 0, nil)
 
 func TestNewClient(t *testing.T) {
 	d := NewDataStorage()
@@ -29,7 +29,7 @@ func TestNewClient(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewClient(tt.args.conn, tt.args.data, 0); !reflect.DeepEqual(got, tt.want) {
+			if got := NewClient(tt.args.conn, tt.args.data, 0, nil); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewClient() = %v, want %v", got, tt.want)
 			}
 		})
@@ -40,7 +40,7 @@ func TestClient_Watch(t *testing.T) {
 	const Num = 100
 	cs := make([]*Client, Num)
 	for i := range cs {
-		cs[i] = NewClient(nil, data, 0)
+		cs[i] = NewClient(nil, data, 0, nil)
 	}
 	for i := 0; i < 100; i++ {
 		cs[i].Watch(strconv.FormatInt(int64(i%5), 10))

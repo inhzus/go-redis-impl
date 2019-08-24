@@ -64,7 +64,7 @@ func NewServer(option *Option) *Server {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := model.NewClient(conn, s.proc.GetData(0), 0)
+	cli := s.proc.NewClient(conn, 0, s.setCh)
 	for {
 		ts, err := token.Deserialize(conn)
 		if err != nil {
@@ -103,7 +103,7 @@ func (s *Server) Serve() {
 	s.queue = make(chan task.Task)
 	s.stop = make(chan struct{})
 	s.setCh = make(chan *model.SetMsg, 2<<10)
-	s.proc = proc.NewProcessor(s.option.DBCount, s.setCh)
+	s.proc = proc.NewProcessor(s.option.DBCount)
 	go func() {
 		for {
 			select {

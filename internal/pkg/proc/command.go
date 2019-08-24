@@ -2,6 +2,7 @@ package proc
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
@@ -44,10 +45,9 @@ const (
 type Processor struct {
 	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
 	data    []*model.DataStorage
-	setCh   chan<- *model.SetMsg
 }
 
-func NewProcessor(n int, setCh chan<- *model.SetMsg) *Processor {
+func NewProcessor(n int) *Processor {
 	p := &Processor{}
 	p.ctrlMap = map[string]func(*model.Client, ...*token.Token) *token.Token{
 		CmdDesc:    p.desc,
@@ -62,12 +62,20 @@ func NewProcessor(n int, setCh chan<- *model.SetMsg) *Processor {
 		CmdUnwatch: p.unwatch,
 		CmdWatch:   p.watch,
 	}
-	p.setCh = setCh
 	p.data = make([]*model.DataStorage, n)
 	for i := 0; i < n; i++ {
 		p.data[i] = model.NewDataStorage()
 	}
 	return p
+}
+
+func (p *Processor) NewClient(conn net.Conn, idx int, ch chan *model.SetMsg) *model.Client {
+	return &model.Client{
+		Conn:  conn,
+		Idx:   idx,
+		Data:  p.data[idx],
+		SetCh: ch,
+	}
 }
 
 func (p *Processor) GenBin(idx int, ch chan<- []byte) {
@@ -180,11 +188,6 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 		}
 	}
 	cli.Set(key.Data.(string), value.Data, expire)
-	t := token.NewArray(token.NewString(CmdSet), token.NewString(key.Data.(string)), token.NewBulked(value.Data))
-	if expire > 0 {
-		t.Data = append(t.Data.([]*token.Token), token.NewString(ExpireAtNano), token.NewInteger(expire))
-	}
-	p.setCh <- &model.SetMsg{Idx: cli.Idx, T: t}
 	return token.ReplyOk
 }
 

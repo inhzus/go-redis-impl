@@ -104,7 +104,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader := bufio.NewReader(rcl)
-	cli := model.NewClient(nil, s.proc.GetData(0), 0)
+	cli := s.proc.NewClient(nil, 0, nil)
 	ch := make(chan *token.Token)
 	for t := range token.DeserializeGenerator(reader) {
 		s.queue <- &model.CmdTask{Cli: cli, Req: t.T, Rsp: ch}
@@ -114,7 +114,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader = bufio.NewReader(aof)
-	cli = model.NewClient(nil, s.proc.GetData(0), 0)
+	cli = s.proc.NewClient(nil, 0, nil)
 	for t := range token.DeserializeGenerator(reader) {
 		s.queue <- &model.CmdTask{Cli: cli, Req: t.T, Rsp: ch}
 		<-ch

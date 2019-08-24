@@ -15,7 +15,7 @@ var proc *Processor
 
 func init() {
 	proc = NewProcessor(16)
-	cli = model.NewClient(nil, proc.data[0], 0)
+	cli = model.NewClient(nil, proc.data[0], 0, nil)
 }
 
 func TestProcessor_ping(t *testing.T) {
@@ -243,7 +243,7 @@ func TestProcessor_exec(t *testing.T) {
 	key := "t_exec"
 	oldValue := "old value"
 	newValue := "new value"
-	c := model.NewClient(nil, proc.data[0], 0)
+	c := model.NewClient(nil, proc.data[0], 0, nil)
 	assert.Equal(t, token.NewError("exec without multi"), proc.exec(cli))
 	assert.Equal(t, token.ReplyOk, proc.multi(cli))
 
@@ -277,7 +277,7 @@ func TestProcessor_discard(t *testing.T) {
 }
 
 func TestProcessor_watch(t *testing.T) {
-	c := model.NewClient(nil, proc.data[0], 0)
+	c := model.NewClient(nil, proc.data[0], 0, nil)
 	key := "t_watch"
 	assert.Equal(t, token.NewError(eStrArgMore),
 		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch))))
@@ -317,7 +317,7 @@ func TestProcessor_watch(t *testing.T) {
 }
 
 func TestProcessor_unwatch(t *testing.T) {
-	c := model.NewClient(nil, proc.data[0], 0)
+	c := model.NewClient(nil, proc.data[0], 0, nil)
 	key := "t_unwatch"
 	assert.Equal(t, token.ReplyOk,
 		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
@@ -348,7 +348,7 @@ func TestProcessor_unwatch(t *testing.T) {
 
 func TestProcessor_sel(t *testing.T) {
 	key := "t_sel"
-	c := model.NewClient(nil, proc.data[0], 0)
+	c := model.NewClient(nil, proc.data[0], 0, nil)
 	assert.Equal(t, token.NewError(eStrArgMore), proc.sel(cli))
 	assert.Equal(t, token.NewError("type of index is string instead of integer"), proc.sel(cli, token.NewString("1")))
 	assert.Equal(t, token.ReplyOk, proc.sel(cli, token.NewInteger(1)))

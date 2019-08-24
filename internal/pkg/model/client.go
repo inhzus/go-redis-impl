@@ -26,11 +26,12 @@ type Client struct {
 	Idx  int
 	// transaction info
 	Multi *MultiInfo
+	SetCh chan *SetMsg
 }
 
 // NewClient returns a client selecting database 0, transaction state false
-func NewClient(conn net.Conn, dataStorage *DataStorage, idx int) *Client {
-	return &Client{Conn: conn, Data: dataStorage, Idx: idx, Multi: &MultiInfo{}}
+func NewClient(conn net.Conn, dataStorage *DataStorage, idx int, setCh chan *SetMsg) *Client {
+	return &Client{Conn: conn, Data: dataStorage, Idx: idx, Multi: &MultiInfo{}, SetCh: setCh}
 }
 
 // Watch append key to self watch list and append self to global watch map
@@ -60,6 +61,13 @@ func (c *Client) Get(key string) interface{} {
 // Set puts key-value pair and its ttl in data
 func (c *Client) Set(key string, value interface{}, expire int64) interface{} {
 	c.Data.watch.Touch(key)
+	if c.SetCh != nil {
+		t := token.NewArray(token.NewString("set"), token.NewString(key), token.NewBulked(value))
+		if expire > 0 {
+			t.Data = append(t.Data.([]*token.Token), token.NewString("PT"), token.NewInteger(expire))
+		}
+		c.SetCh <- &SetMsg{Idx: c.Idx, T: t}
+	}
 	return c.Data.Set(key, value, expire)
 }
 
