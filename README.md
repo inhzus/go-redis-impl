@@ -4,13 +4,17 @@ The project is aiming to implement redis in golang
 
 ## Implemented functionality
 
+- Persistence
+  
+  The server automatically records every single value-changing command to AOF file and frequently clones the whole data to file
+
 - Transaction
 
   Supported transaction commands: watch, unwatch, multi, discard, exec
 
 - Pipeline
 
-  Really efficient according to benchmark result
+  Efficient according to benchmark results
 
 - Timeout
 
@@ -24,11 +28,11 @@ The project is aiming to implement redis in golang
 
   Supported data types: string, binary, integer
 
-  implementation of more data types like linked list, hash dict, set etc. is on the way just after fundamental functionality implementation.
+  Implementation of more data types like linked list, hash dict, set etc. is on the way just after fundamental functionality implementation
 
 - Client btw
 
-  Client can support all commands with server library
+  The client can support all commands with server library
 
 - Basic read/write
 
@@ -43,12 +47,12 @@ The project is aiming to implement redis in golang
 
 # TODO
 
-- Sub / Pub
+1. CLI
 
-- AOF
+2. Sub / Pub
 
-- RDB
+3. Testcases for persistence
 
-- More detailed commands e.g. ttl, expire etc.
+4. More detailed commands e.g. ttl, expire etc.
 
-- More data types e.g. set, ordered set, hash etc.
+5. More data types e.g. set, ordered set, hash etc.
