@@ -93,6 +93,7 @@ func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 func (p *Processor) GetData(idx int) *model.DataStorage {
 	return p.data[idx]
 }
+
 // execCmd returns result of parsing request command and arguments
 func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 	if req == nil {
@@ -156,6 +157,9 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 	}
 	var expire int64
 	for i := 2; i < len(tokens); i++ {
+		if tokens[i] == nil {
+			return token.NewError("empty token")
+		}
 		if err := checkType(tokens[i], "argument", label.String); err != nil {
 			return token.NewError(err.Error())
 		}
