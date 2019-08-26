@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
 	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/task"
@@ -13,18 +14,6 @@ import (
 
 // proc string
 const (
-	CmdDesc    = "desc"
-	CmdDiscard = "discard"
-	CmdExec    = "exec"
-	CmdGet     = "get"
-	CmdIncr    = "incr"
-	CmdMulti   = "multi"
-	CmdSelect  = "select"
-	CmdSet     = "set"
-	CmdPing    = "ping"
-	CmdUnwatch = "unwatch"
-	CmdWatch   = "watch"
-
 	ModFreeze = "freeze"
 	ModMove   = "move"
 )
@@ -50,17 +39,17 @@ type Processor struct {
 func NewProcessor(n int) *Processor {
 	p := &Processor{}
 	p.ctrlMap = map[string]func(*model.Client, ...*token.Token) *token.Token{
-		CmdDesc:    p.desc,
-		CmdDiscard: p.discard,
-		CmdExec:    p.exec,
-		CmdGet:     p.get,
-		CmdIncr:    p.incr,
-		CmdMulti:   p.multi,
-		CmdSelect:  p.sel,
-		CmdSet:     p.set,
-		CmdPing:    p.ping,
-		CmdUnwatch: p.unwatch,
-		CmdWatch:   p.watch,
+		cds.Desc:    p.desc,
+		cds.Discard: p.discard,
+		cds.Exec:    p.exec,
+		cds.Get:     p.get,
+		cds.Incr:    p.incr,
+		cds.Multi:   p.multi,
+		cds.Select:  p.sel,
+		cds.Set:     p.set,
+		cds.Ping:    p.ping,
+		cds.Unwatch: p.unwatch,
+		cds.Watch:   p.watch,
 	}
 	p.data = make([]*model.DataStorage, n)
 	for i := 0; i < n; i++ {
@@ -81,7 +70,7 @@ func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 	}
 	for k, v := range data {
 		val, _ := ItfToBulked(v.Row)
-		t := token.NewArray(token.NewString(CmdSet), token.NewString(k), token.NewBulked(val))
+		t := token.NewArray(token.NewString(cds.Set), token.NewString(k), token.NewBulked(val))
 		if v.Expire > 0 {
 			t.Data = append(t.Data.([]*token.Token), token.NewString(ExpireAtNano), token.NewInteger(v.Expire))
 		}
@@ -109,7 +98,7 @@ func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 	}
 	if cli.Multi.State {
 		switch cmd.Data.(string) {
-		case CmdDiscard, CmdExec, CmdMulti, CmdWatch:
+		case cds.Discard, cds.Exec, cds.Multi, cds.Watch:
 		default:
 			cli.Multi.Queue = append(cli.Multi.Queue, req)
 			return token.ReplyQueued

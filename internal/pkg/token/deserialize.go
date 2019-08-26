@@ -72,7 +72,7 @@ func parseItem(reader *bufio.Reader) (*Token, error) {
 		}
 		return &Token{Label: label.Array, Data: tokens}, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("unrecognized label")
 }
 
 func Deserialize(conn net.Conn) ([]*Token, error) {

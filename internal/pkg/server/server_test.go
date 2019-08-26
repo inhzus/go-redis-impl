@@ -20,7 +20,7 @@ func init() {
 
 func TestServer_Serve(t *testing.T) {
 	go s.Serve()
-	<-time.After(time.Second / 10)
+	<-time.After(time.Second)
 	cli := client.NewClient(&client.Option{})
 	err := cli.Connect()
 	if err != nil {

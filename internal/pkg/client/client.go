@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -22,6 +22,7 @@ type Task struct {
 
 type Option struct {
 	Addr         string
+	Database     int
 	Proto        string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -29,7 +30,7 @@ type Option struct {
 
 type Client struct {
 	option  *Option
-	conn    net.Conn
+	Conn    net.Conn
 	queue   chan *Task
 	stop    chan struct{}
 	request func(*token.Token) *Response
@@ -63,9 +64,9 @@ func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 	data := buffer.Bytes()
 	var err error
 	if c.option.WriteTimeout > 0 {
-		_ = c.conn.SetWriteDeadline(time.Now().Add(c.option.WriteTimeout))
+		_ = c.Conn.SetWriteDeadline(time.Now().Add(c.option.WriteTimeout))
 	}
-	_, err = c.conn.Write(data)
+	_, err = c.Conn.Write(data)
 	if err != nil {
 		rspCh <- &Response{Err: err}
 		return
@@ -73,7 +74,7 @@ func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 	endCh := make(chan struct{})
 	var responses []*Response
 	go func() {
-		rsp, _ := token.Deserialize(c.conn)
+		rsp, _ := token.Deserialize(c.Conn)
 		for _, t := range rsp {
 			responses = append(responses, &Response{Data: t})
 		}
@@ -90,14 +91,13 @@ func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 		<-endCh
 	}
 	for _, rsp := range responses {
-		glog.Infof(rsp.Data.Format())
 		rspCh <- rsp
 	}
 	return
 }
 
 func (c *Client) Connect() (err error) {
-	c.conn, err = net.Dial(c.option.Proto, c.option.Addr)
+	c.Conn, err = net.DialTimeout(c.option.Proto, c.option.Addr, time.Second)
 	if err != nil {
 		return
 	}
@@ -115,12 +115,15 @@ func (c *Client) Connect() (err error) {
 			}
 		}
 	}()
+	if c.option.Database > 0 {
+		c.Submit(token.NewArray(token.NewString(cds.Select), token.NewInteger(int64(c.option.Database))))
+	}
 	return
 }
 
 func (c *Client) Close() {
-	if c.conn != nil {
-		_ = c.conn.Close()
+	if c.Conn != nil {
+		_ = c.Conn.Close()
 		c.stop <- struct{}{}
 		<-c.stop
 	}
@@ -128,7 +131,7 @@ func (c *Client) Close() {
 
 func (c *Client) Submit(t ...*token.Token) <-chan *Response {
 	ch := make(chan *Response, 1)
-	if c.conn == nil {
+	if c.Conn == nil {
 		go func() { ch <- &Response{Err: fmt.Errorf("connection is nil")} }()
 		return ch
 	}
@@ -138,9 +141,6 @@ func (c *Client) Submit(t ...*token.Token) <-chan *Response {
 
 func (c *Client) req(t *token.Token) *Response {
 	rsp := <-c.Submit(t)
-	if rsp.Err != nil {
-		glog.Error(rsp.Err.Error())
-	}
 	return rsp
 }
 

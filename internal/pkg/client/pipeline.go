@@ -22,7 +22,7 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 		return nil, nil
 	}
 	defer func() { p.commands = nil }()
-	if p.Client.conn == nil {
+	if p.Client.Conn == nil {
 		return nil, fmt.Errorf("connection is nil")
 	}
 	var responses []*Response

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/proc"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
@@ -39,7 +40,7 @@ func (s *Server) cloneData() (err error) {
 			continue
 		}
 		// select database
-		t, _ := token.NewArray(token.NewString(proc.CmdSelect), token.NewInteger(int64(i))).Serialize()
+		t, _ := token.NewArray(token.NewString(cds.Select), token.NewInteger(int64(i))).Serialize()
 		buffer.Write(t)
 		// send channel to receive data
 		dataCh := make(chan []byte)
@@ -156,7 +157,7 @@ func (s *Server) persistence() {
 		case m := <-s.setCh:
 			d, _ := m.T.Serialize()
 			if m.Idx != idx {
-				d, _ = token.NewArray(token.NewString(proc.CmdSelect), token.NewInteger(int64(m.Idx))).Serialize()
+				d, _ = token.NewArray(token.NewString(cds.Select), token.NewInteger(int64(m.Idx))).Serialize()
 				buffer.Write(d)
 			}
 			buffer.Write(d)

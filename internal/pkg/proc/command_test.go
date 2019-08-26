@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 	"github.com/stretchr/testify/assert"
@@ -235,7 +236,7 @@ func TestProcessor_multi(t *testing.T) {
 		})
 	}
 	assert.Equal(t, token.NewError("multi calls can not be nested"),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	proc.exec(cli)
 }
 
@@ -248,102 +249,102 @@ func TestProcessor_exec(t *testing.T) {
 	assert.Equal(t, token.ReplyOk, proc.multi(cli))
 
 	assert.Equal(t, token.ReplyQueued, proc.execCmd(cli,
-		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued, proc.execCmd(cli,
-		token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewString(newValue))))
+		token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewString(newValue))))
 
 	assert.Equal(t, token.ReplyOk, proc.execCmd(c,
-		token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewString(oldValue))))
+		token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewString(oldValue))))
 	assert.Equal(t, token.NewBulked([]byte(oldValue)), proc.execCmd(c,
-		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 
 	assert.Equal(t, token.ReplyQueued, proc.execCmd(cli,
-		token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte(oldValue)), token.ReplyOk, token.NewBulked([]byte(newValue))),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
-	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
-	assert.Equal(t, token.NewArray(), proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
+	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
+	assert.Equal(t, token.NewArray(), proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 }
 
 func TestProcessor_discard(t *testing.T) {
 	assert.Equal(t, token.NewError("discard calls without multi"),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdDiscard))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Discard))))
 	assert.Equal(t, token.ReplyOk, proc.multi(cli))
-	assert.Equal(t, token.ReplyQueued, proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString("a"))))
-	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(CmdDiscard))))
-	assert.Equal(t, token.NewError("exec without multi"), proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
-	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
-	assert.Equal(t, token.NewArray(), proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+	assert.Equal(t, token.ReplyQueued, proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString("a"))))
+	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(cds.Discard))))
+	assert.Equal(t, token.NewError("exec without multi"), proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
+	assert.Equal(t, token.ReplyOk, proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
+	assert.Equal(t, token.NewArray(), proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 }
 
 func TestProcessor_watch(t *testing.T) {
 	c := model.NewClient(nil, proc.data[0], 0, nil)
 	key := "t_watch"
 	assert.Equal(t, token.NewError(eStrArgMore),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch))))
 	assert.Equal(t, token.NewError("type of key is bulked instead of string"),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewBulked([]byte(key)))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewBulked([]byte(key)))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+		proc.execCmd(c, token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewInteger(2))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	assert.Equal(t, token.NewError("watch inside multi is not allowed"),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("2"))),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 	assert.Zero(t, cli.Multi.Watched)
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(3))))
+		proc.execCmd(c, token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewInteger(3))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("3"))),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	assert.Equal(t, token.NewInteger(4),
-		proc.execCmd(c, token.NewArray(token.NewString(CmdIncr), token.NewString(key))))
+		proc.execCmd(c, token.NewArray(token.NewString(cds.Incr), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.NewArray(),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 }
 
 func TestProcessor_unwatch(t *testing.T) {
 	c := model.NewClient(nil, proc.data[0], 0, nil)
 	key := "t_unwatch"
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdUnwatch))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Unwatch))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(1))))
+		proc.execCmd(c, token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewInteger(1))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.NewArray(token.NewBulked([]byte("1"))),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdWatch), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdMulti))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdUnwatch))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Unwatch))))
 	assert.Equal(t, token.ReplyQueued,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdGet), token.NewString(key))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(c, token.NewArray(token.NewString(CmdSet), token.NewString(key), token.NewInteger(2))))
+		proc.execCmd(c, token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewInteger(2))))
 	assert.Equal(t, token.NewArray(),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdExec))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Exec))))
 }
 
 func TestProcessor_sel(t *testing.T) {
@@ -364,15 +365,15 @@ func TestProcessor_Exec(t *testing.T) {
 	assert.Equal(t, token.NewError("empty token"),
 		proc.execCmd(cli, token.NewArray()))
 	assert.Equal(t, token.NewError("type of command is bulked instead of string"),
-		proc.execCmd(cli, token.NewArray(token.NewBulked([]byte(CmdGet)))))
+		proc.execCmd(cli, token.NewArray(token.NewBulked([]byte(cds.Get)))))
 	assert.Equal(t, token.NewString(strPong),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdPing))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Ping))))
 	assert.Equal(t, token.NewInteger(-1),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdDesc), token.NewString("t_process"))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Desc), token.NewString("t_process"))))
 	assert.Equal(t, token.NewInteger(0),
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdIncr), token.NewString("t_process"))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Incr), token.NewString("t_process"))))
 	assert.Equal(t, token.ReplyOk,
-		proc.execCmd(cli, token.NewArray(token.NewString(CmdSelect), token.NewInteger(2))))
+		proc.execCmd(cli, token.NewArray(token.NewString(cds.Select), token.NewInteger(2))))
 	assert.Equal(t, proc.data[2], cli.Data)
 	assert.Equal(t, token.NewError("unrecognized command"),
 		proc.execCmd(cli, token.NewArray(token.NewString("unknown command"))))

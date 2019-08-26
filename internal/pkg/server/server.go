@@ -67,14 +67,15 @@ func (s *Server) handleConnection(conn net.Conn) {
 	cli := s.proc.NewClient(conn, 0, s.setCh)
 	for {
 		ts, err := token.Deserialize(conn)
+		var data []byte
 		if err != nil {
 			if err == io.EOF {
 				glog.Infof("client %v connection closed", conn.RemoteAddr())
 				return
 			}
 			glog.Error(err)
+			data, _ = token.NewError(err.Error()).Serialize()
 		}
-		var data []byte
 		for _, req := range ts {
 			glog.Infof("request: %v", req.Format())
 			c := make(chan *token.Token)
@@ -121,7 +122,9 @@ func (s *Server) Serve() {
 	go s.persistence()
 	for {
 		conn, err := listener.Accept()
-		checkErr(err)
+		if err != nil {
+			break
+		}
 		go s.handleConnection(conn)
 	}
 }
