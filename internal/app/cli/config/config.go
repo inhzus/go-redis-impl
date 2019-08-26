@@ -5,16 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/golang/go/src/pkg/log"
 	"github.com/inhzus/go-redis-impl/internal/pkg/client"
 )
 
-func logInit() {
-	_ = flag.Set("stderrthreshold", "INFO")
-}
-
 func Init() *client.Option {
-	logInit()
 	option := &client.Option{}
 	var host, port string
 	var readTimeout, writeTimeout int64
