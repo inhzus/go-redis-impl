@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,12 +10,28 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
-	"github.com/inhzus/go-redis-impl/internal/app/cli/config"
 	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
 	"github.com/inhzus/go-redis-impl/internal/pkg/client"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
+
+func getOption() *client.Option {
+	option := &client.Option{}
+	var host, port string
+	var readTimeout, writeTimeout int64
+	flag.StringVar(&option.Proto, "protocol", "tcp", "protocol")
+	flag.StringVar(&host, "host", "127.0.0.1", "host")
+	flag.StringVar(&port, "port", "6389", "port")
+	flag.Int64Var(&readTimeout, "rt", 0, "read timeout (ms), \"0\" represents unlimited")
+	flag.Int64Var(&writeTimeout, "wt", 0, "write timeout (ms), \"0\" represents unlimited")
+	flag.Parse()
+	option.Addr = fmt.Sprintf("%s:%s", host, port)
+	option.ReadTimeout = time.Duration(readTimeout) * time.Millisecond
+	option.WriteTimeout = time.Duration(writeTimeout) * time.Millisecond
+	return option
+}
 
 func splitIntoArray(line string) []string {
 	var r = regexp.MustCompile(`[^\W"]+|"[^"]+"`)
@@ -46,8 +63,8 @@ func formArray(a []string) []byte {
 }
 
 func main() {
-	conf := config.Init()
-	cli := client.NewClient(conf)
+	opt := getOption()
+	cli := client.NewClient(opt)
 	err := cli.Connect()
 
 	teardown := func() { fmt.Println(); cli.Close(); os.Exit(0) }
@@ -65,7 +82,7 @@ func main() {
 	var line string
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Printf("%s[%d]>", conf.Addr, conf.Database)
+		fmt.Printf("%s[%d]>", opt.Addr, opt.Database)
 		line, err = reader.ReadString('\n')
 		if err != nil || len(line) <= 1 {
 			teardown()
@@ -89,7 +106,7 @@ func main() {
 				fmt.Printf("database index unable to parse")
 				continue
 			}
-			conf.Database = int(n)
+			opt.Database = int(n)
 			cmd[1] = formNum(cmd[1])
 		case cds.Set:
 			cmd[1] = formStr(cmd[1])
