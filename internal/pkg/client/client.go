@@ -50,63 +50,50 @@ func NewClient(option *Option) *Client {
 }
 
 func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
-	for {
-		buffer := &bytes.Buffer{}
-		for _, t := range ts {
-			d, err := t.Serialize()
-			if err != nil {
-				rspCh <- &Response{Err: err}
-				break
-			}
-			buffer.Write(d)
-		}
-		data := buffer.Bytes()
-		var err error
-		if c.option.WriteTimeout > 0 {
-			errCh := make(chan error)
-			go func() {
-				_, er := c.conn.Write(data)
-				errCh <- er
-			}()
-			select {
-			case err = <-errCh:
-			case <-time.After(c.option.WriteTimeout):
-				rspCh <- &Response{Err: fmt.Errorf("write data to connection timeout")}
-				break
-			}
-		} else {
-			_, err = c.conn.Write(data)
-		}
+	defer close(rspCh)
+	buffer := &bytes.Buffer{}
+	for _, t := range ts {
+		d, err := t.Serialize()
 		if err != nil {
 			rspCh <- &Response{Err: err}
-			break
+			return
 		}
-		endCh := make(chan struct{})
-		var responses []*Response
-		go func() {
-			rsp, _ := token.Deserialize(c.conn)
-			for _, t := range rsp {
-				glog.Infof(t.Format())
-				responses = append(responses, &Response{Data: t})
-			}
-			endCh <- struct{}{}
-		}()
-		if c.option.ReadTimeout > 0 {
-			select {
-			case <-endCh:
-			case <-time.After(c.option.ReadTimeout):
-				rspCh <- &Response{Err: fmt.Errorf("read data from connection timeout")}
-				break
-			}
-		} else {
-			<-endCh
-		}
-		for _, rsp := range responses {
-			rspCh <- rsp
-		}
-		break
+		buffer.Write(d)
 	}
-	close(rspCh)
+	data := buffer.Bytes()
+	var err error
+	if c.option.WriteTimeout > 0 {
+		_ = c.conn.SetWriteDeadline(time.Now().Add(c.option.WriteTimeout))
+	}
+	_, err = c.conn.Write(data)
+	if err != nil {
+		rspCh <- &Response{Err: err}
+		return
+	}
+	endCh := make(chan struct{})
+	var responses []*Response
+	go func() {
+		rsp, _ := token.Deserialize(c.conn)
+		for _, t := range rsp {
+			responses = append(responses, &Response{Data: t})
+		}
+		endCh <- struct{}{}
+	}()
+	if c.option.ReadTimeout > 0 {
+		select {
+		case <-endCh:
+		case <-time.After(c.option.ReadTimeout):
+			rspCh <- &Response{Err: fmt.Errorf("read data from connection timeout")}
+			return
+		}
+	} else {
+		<-endCh
+	}
+	for _, rsp := range responses {
+		glog.Infof(rsp.Data.Format())
+		rspCh <- rsp
+	}
+	return
 }
 
 func (c *Client) Connect() (err error) {
@@ -140,13 +127,10 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Submit(t ...*token.Token) <-chan *Response {
-	ch := make(chan *Response)
+	ch := make(chan *Response, 1)
 	if c.conn == nil {
-		defer c.Close()
-		if err := c.Connect(); err != nil {
-			ch <- &Response{Err: err}
-			close(ch)
-		}
+		go func() { ch <- &Response{Err: fmt.Errorf("connection is nil")} }()
+		return ch
 	}
 	c.queue <- &Task{Req: t, Rsp: ch}
 	return ch
@@ -154,6 +138,9 @@ func (c *Client) Submit(t ...*token.Token) <-chan *Response {
 
 func (c *Client) req(t *token.Token) *Response {
 	rsp := <-c.Submit(t)
+	if rsp.Err != nil {
+		glog.Error(rsp.Err.Error())
+	}
 	return rsp
 }
 

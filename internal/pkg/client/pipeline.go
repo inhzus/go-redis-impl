@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
@@ -20,14 +21,15 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 	if len(p.commands) == 0 {
 		return nil, nil
 	}
+	defer func() { p.commands = nil }()
 	if p.Client.conn == nil {
-		defer p.Client.Close()
-		if err := p.Client.Connect(); err != nil {
-			return nil, fmt.Errorf("connection nil")
-		}
+		return nil, fmt.Errorf("connection is nil")
 	}
 	var responses []*Response
 	for t := range p.Client.Submit(p.commands...) {
+		if t.Err != nil {
+			glog.Errorf("%s", t.Err.Error())
+		}
 		responses = append(responses, t)
 	}
 	if len(responses) == len(p.commands) {
@@ -35,7 +37,6 @@ func (p *Pipeline) Exec() ([]*token.Token, error) {
 			p.commands[i].Label = item.Data.Label
 			p.commands[i].Data = item.Data.Data
 		}
-		defer func() { p.commands = nil }()
 		return p.commands, nil
 	}
 	return nil, responses[0].Err
