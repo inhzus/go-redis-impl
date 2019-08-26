@@ -61,6 +61,7 @@ func NewDataStorage() *DataStorage {
 	return &DataStorage{data: make(map[string]*Item), queue: &priorityQueue{}, watch: newWatchMap()}
 }
 
+// GetOrigin returns the original data of the data storage.
 func (d *DataStorage) GetOrigin() map[string]*Item {
 	return d.oldData
 }

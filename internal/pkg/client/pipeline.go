@@ -7,6 +7,9 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
+// Pipeline shares the connection and consumer of the original
+// client. Certainly it is safe for concurrent use of
+// multiple goroutines.
 type Pipeline struct {
 	Client
 	commands []*token.Token
@@ -17,6 +20,8 @@ func (p *Pipeline) req(t *token.Token) *Response {
 	return &Response{Data: t}
 }
 
+// Exec executes all the commands stored. It ends with clearing
+// the commands array.
 func (p *Pipeline) Exec() ([]*token.Token, error) {
 	if len(p.commands) == 0 {
 		return nil, nil

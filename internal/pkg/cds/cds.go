@@ -1,5 +1,12 @@
+/*
+The full name of the package is `command string`.
+Extracting these constants from package proc is a must in my opinion
+because they're either used by package client.
+Client that imports processor of a server is weird in my mind.
+*/
 package cds
 
+// command string
 const (
 	Desc    = "desc"
 	Discard = "discard"

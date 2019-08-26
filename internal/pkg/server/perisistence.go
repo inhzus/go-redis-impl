@@ -76,6 +76,7 @@ func (s *Server) cloneData() (err error) {
 	if err != nil {
 		return
 	}
+	// empty aof after clone
 	_, err = os.OpenFile(s.option.Persist.AppendName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return
@@ -83,6 +84,7 @@ func (s *Server) cloneData() (err error) {
 	if !s.option.Persist.SaveCopy {
 		return
 	}
+	// copy the rcl file with timestamp
 	dst, err = os.OpenFile(
 		fmt.Sprintf("%v.%v", s.option.Persist.CloneName, time.Now().Format("0102-15:04:05")),
 		os.O_CREATE|os.O_WRONLY,
@@ -103,17 +105,20 @@ func (s *Server) cloneData() (err error) {
 	return err
 }
 
+// restore data from the aof and rcl
 func (s *Server) restoreData() {
 	rcl, err := os.OpenFile(s.option.Persist.CloneName, os.O_CREATE|os.O_RDONLY, 0644)
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader := bufio.NewReader(rcl)
 	cli := s.proc.NewClient(nil, 0, nil)
+	// restore from the rcl
 	ch := make(chan *token.Token)
 	for t := range token.DeserializeGenerator(reader) {
 		s.queue <- &model.CmdTask{Cli: cli, Req: t.T, Rsp: ch}
 		<-ch
 	}
+	// then restore from the aof
 	aof, err := os.OpenFile(s.option.Persist.AppendName, os.O_CREATE|os.O_RDWR, 0644)
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
@@ -128,7 +133,9 @@ func (s *Server) restoreData() {
 }
 
 func (s *Server) persistence() {
+	// store the db to file instantly after server started
 	checkErr(s.cloneData())
+	// clone the whole data to the rcl periodically
 	go func() {
 		rewriteTicker := time.NewTicker(s.option.Persist.RewriteInr)
 		for {
@@ -146,6 +153,7 @@ func (s *Server) persistence() {
 	var buffer bytes.Buffer
 	for {
 		select {
+		// flush the aof file periodically
 		case <-flushTicker.C:
 			if buffer.Len() > 0 {
 				_, err = buffer.WriteTo(file)
@@ -157,6 +165,7 @@ func (s *Server) persistence() {
 					glog.Errorf("file sync: %v", err.Error())
 				}
 			}
+			// receive the set msgs from the model clients and sync them to the aof
 		case m := <-s.setCh:
 			d, _ := m.T.Serialize()
 			if m.Idx != idx {

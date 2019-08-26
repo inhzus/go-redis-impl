@@ -24,11 +24,15 @@ const (
 	eStrArgMore  = "not enough arguments"
 )
 
+// Processor handles all the tasks sent from the connection handlers
+// to the consumer.
 type Processor struct {
 	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
 	data    []*model.DataStorage
 }
 
+// NewProcessor returns a pointer to the processor which has initialized
+// table-driven methods and data storage.
 func NewProcessor(n int) *Processor {
 	p := &Processor{}
 	p.ctrlMap = map[string]func(*model.Client, ...*token.Token) *token.Token{
@@ -51,10 +55,12 @@ func NewProcessor(n int) *Processor {
 	return p
 }
 
+// NewClient generates a new client.
 func (p *Processor) NewClient(conn net.Conn, idx int, ch chan *model.SetMsg) *model.Client {
 	return model.NewClient(conn, p.data[idx], idx, ch)
 }
 
+// GenBin is a generator which yields every key-value pair of the original data.
 func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 	defer close(ch)
 	data := p.data[idx].GetOrigin()
@@ -72,6 +78,7 @@ func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 	}
 }
 
+// GetData returns the data storage at the given index.
 func (p *Processor) GetData(idx int) *model.DataStorage {
 	return p.data[idx]
 }
@@ -113,6 +120,7 @@ func (p *Processor) execMod(cmd string, index int) error {
 	return fmt.Errorf("unrecognized command")
 }
 
+// Do handles all the tasks consumed by the server consumer.
 func (p *Processor) Do(tsk task.Task) {
 	switch t := tsk.(type) {
 	case *model.CmdTask:

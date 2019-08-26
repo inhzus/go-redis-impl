@@ -19,6 +19,7 @@ type Option struct {
 	Persist struct {
 		AppendName string
 		CloneName  string
+		Enable     bool
 		FlushInr   time.Duration
 		RewriteInr time.Duration
 		SaveCopy   bool
@@ -119,7 +120,9 @@ func (s *Server) Serve() {
 			}
 		}
 	}()
-	s.restoreData()
+	if s.option.Persist.Enable {
+		s.restoreData()
+	}
 	go s.persistence()
 	for {
 		conn, err := listener.Accept()

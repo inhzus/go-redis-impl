@@ -10,16 +10,21 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
+// Response contains original tokens deserialized from binary raw
+// and error generated during communicate with server.
 type Response struct {
 	Data *token.Token
 	Err  error
 }
 
+// Task is the structure hold by the channel which connects front-end
+// interactive functions and consumer.
 type Task struct {
 	Req []*token.Token
 	Rsp chan *Response
 }
 
+// Option contains basic configurations of client.
 type Option struct {
 	Addr         string
 	Database     int
@@ -28,6 +33,8 @@ type Option struct {
 	WriteTimeout time.Duration
 }
 
+// Client is a go-redis-impl client and is safe for concurrent use
+// by multiple goroutines.
 type Client struct {
 	option  *Option
 	Conn    net.Conn
@@ -36,6 +43,7 @@ type Client struct {
 	request func(*token.Token) *Response
 }
 
+// NewClient returns a pointer to Client entity with given option.
 func NewClient(option *Option) *Client {
 	if option.Proto == "" {
 		option.Proto = "tcp"
@@ -96,6 +104,8 @@ func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 	return
 }
 
+// Connect tries to dial server, starts a consumer goroutine,
+// and selects the given database index directly.
 func (c *Client) Connect() (err error) {
 	c.Conn, err = net.DialTimeout(c.option.Proto, c.option.Addr, time.Second)
 	if err != nil {
@@ -121,6 +131,7 @@ func (c *Client) Connect() (err error) {
 	return
 }
 
+// Close interrupts the connection to server and stops the consumer.
 func (c *Client) Close() {
 	if c.Conn != nil {
 		_ = c.Conn.Close()
@@ -129,6 +140,8 @@ func (c *Client) Close() {
 	}
 }
 
+// Submit submits serialized tokens to consumer and returns a channel
+// with response.
 func (c *Client) Submit(t ...*token.Token) <-chan *Response {
 	ch := make(chan *Response, 1)
 	if c.Conn == nil {
@@ -144,6 +157,8 @@ func (c *Client) req(t *token.Token) *Response {
 	return rsp
 }
 
+// Pipeline returns a go-redis-impl pipeline. It takes usage of
+// the connection and consumer of the original client.
 func (c *Client) Pipeline() *Pipeline {
 	p := &Pipeline{Client: *c}
 	p.request = p.req
