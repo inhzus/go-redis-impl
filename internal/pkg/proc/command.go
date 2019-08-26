@@ -70,12 +70,7 @@ func NewProcessor(n int) *Processor {
 }
 
 func (p *Processor) NewClient(conn net.Conn, idx int, ch chan *model.SetMsg) *model.Client {
-	return &model.Client{
-		Conn:  conn,
-		Idx:   idx,
-		Data:  p.data[idx],
-		SetCh: ch,
-	}
+	return model.NewClient(conn, p.data[idx], idx, ch)
 }
 
 func (p *Processor) GenBin(idx int, ch chan<- []byte) {
