@@ -18,13 +18,6 @@ const (
 	ModMove   = "move"
 )
 
-// argument string
-const (
-	TimeoutSec    = "EX"
-	TimeoutMilSec = "PX"
-	ExpireAtNano  = "PT"
-)
-
 const (
 	strPong      = "pong"
 	eStrMismatch = "type of %v is %v instead of %v"
@@ -72,7 +65,7 @@ func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 		val, _ := ItfToBulked(v.Row)
 		t := token.NewArray(token.NewString(cds.Set), token.NewString(k), token.NewBulked(val))
 		if v.Expire > 0 {
-			t.Data = append(t.Data.([]*token.Token), token.NewString(ExpireAtNano), token.NewInteger(v.Expire))
+			t.Data = append(t.Data.([]*token.Token), token.NewString(cds.ExpireAtNano), token.NewInteger(v.Expire))
 		}
 		d, _ := t.Serialize()
 		ch <- d
@@ -154,7 +147,7 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 		}
 		arg := tokens[i].Data.(string)
 		switch arg {
-		case TimeoutMilSec, TimeoutSec, ExpireAtNano:
+		case cds.TimeoutMilSec, cds.TimeoutSec, cds.ExpireAtNano:
 			i++
 			if len(tokens) < i+1 {
 				return token.NewError("argument missing of %s", arg)
@@ -164,11 +157,11 @@ func (p *Processor) set(cli *model.Client, tokens ...*token.Token) *token.Token 
 			}
 			num := tokens[i].Data.(int64)
 			switch arg {
-			case TimeoutSec:
+			case cds.TimeoutSec:
 				expire = time.Now().Add(time.Duration(num) * time.Second).UnixNano()
-			case TimeoutMilSec:
+			case cds.TimeoutMilSec:
 				expire = time.Now().Add(time.Duration(num) * time.Millisecond).UnixNano()
-			case ExpireAtNano:
+			case cds.ExpireAtNano:
 				expire = num
 			}
 		default:

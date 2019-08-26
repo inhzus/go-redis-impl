@@ -21,7 +21,7 @@ func (c *Client) Set(key string, value interface{}, timeout time.Duration) *Resp
 	row := token.NewArray(token.NewString(cds.Set), token.NewString(key), token.NewBulked(bulked))
 	if timeout > 0 {
 		row.Data = append(row.Data.([]*token.Token),
-			token.NewString(proc.TimeoutMilSec), token.NewInteger(int64(timeout/time.Millisecond)))
+			token.NewString(cds.TimeoutMilSec), token.NewInteger(int64(timeout/time.Millisecond)))
 	}
 	return c.request(row)
 }

@@ -13,3 +13,10 @@ const (
 	Unwatch = "unwatch"
 	Watch   = "watch"
 )
+
+// argument string
+const (
+	TimeoutSec    = "EX"
+	TimeoutMilSec = "PX"
+	ExpireAtNano  = "PT"
+)
