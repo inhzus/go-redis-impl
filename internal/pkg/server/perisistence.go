@@ -76,6 +76,13 @@ func (s *Server) cloneData() (err error) {
 	if err != nil {
 		return
 	}
+	_, err = os.OpenFile(s.option.Persist.AppendName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	if !s.option.Persist.SaveCopy {
+		return
+	}
 	dst, err = os.OpenFile(
 		fmt.Sprintf("%v.%v", s.option.Persist.CloneName, time.Now().Format("0102-15:04:05")),
 		os.O_CREATE|os.O_WRONLY,
@@ -93,10 +100,6 @@ func (s *Server) cloneData() (err error) {
 		return
 	}
 	err = dst.Sync()
-	if err != nil {
-		return
-	}
-	_, err = os.OpenFile(s.option.Persist.AppendName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	return err
 }
 

@@ -62,7 +62,7 @@ func (c *Client) Get(key string) interface{} {
 func (c *Client) Set(key string, value interface{}, expire int64) interface{} {
 	c.Data.watch.Touch(key)
 	if c.SetCh != nil {
-		t := token.NewArray(token.NewString("set"), token.NewString(key), token.NewBulked(value))
+		t := token.NewArray(token.NewString("set"), token.NewString(key), token.NewToken(value))
 		if expire > 0 {
 			t.Data = append(t.Data.([]*token.Token), token.NewString("PT"), token.NewInteger(expire))
 		}

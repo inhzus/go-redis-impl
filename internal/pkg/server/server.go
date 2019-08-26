@@ -21,6 +21,7 @@ type Option struct {
 		CloneName  string
 		FlushInr   time.Duration
 		RewriteInr time.Duration
+		SaveCopy   bool
 	}
 	Proto string
 }
@@ -103,7 +104,7 @@ func (s *Server) Serve() {
 	checkErr(err)
 	s.queue = make(chan task.Task)
 	s.stop = make(chan struct{})
-	s.setCh = make(chan *model.SetMsg, 2<<10)
+	s.setCh = make(chan *model.SetMsg)
 	s.proc = proc.NewProcessor(s.option.DBCount)
 	go func() {
 		for {

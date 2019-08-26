@@ -28,3 +28,15 @@ func NewBulked(data interface{}) *Token {
 func NewArray(tokens ...*Token) *Token {
 	return &Token{label.Array, tokens}
 }
+
+func NewToken(v interface{}) *Token {
+	switch r := v.(type) {
+	case []byte:
+		return NewBulked(r)
+	case int64:
+		return NewInteger(r)
+	case string:
+		return NewString(r)
+	}
+	return nil
+}
