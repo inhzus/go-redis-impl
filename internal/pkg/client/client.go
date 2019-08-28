@@ -78,7 +78,7 @@ is timeout, the consumer will stops waiting for the signal that response is
 reached and continues to wait for another request sent to the consumer, but
 the goroutine will still hang until the response is reached. In this way, I
 manage to prevent from reading the last response.
- */
+*/
 func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 	defer close(rspCh)
 	buffer := &bytes.Buffer{}

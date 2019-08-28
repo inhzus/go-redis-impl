@@ -34,7 +34,7 @@ func getOption() *client.Option {
 }
 
 func splitIntoArray(line string) []string {
-	var r = regexp.MustCompile(`[^\W"]+|"[^"]+"`)
+	var r = regexp.MustCompile(`[^\s"]+|"[^"]+"`)
 	fi := r.FindAllString(line, -1)
 	for i, s := range fi {
 		if s[0] == '"' {
