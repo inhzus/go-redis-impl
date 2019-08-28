@@ -58,6 +58,27 @@ func NewClient(option *Option) *Client {
 	return c
 }
 
+/*
+consume is the consumer which consumes tasks sent by the server side.
+1. Why consumer is necessary?
+Go-redis-impl client is single-threaded, so consume with using golang channel
+is the best implementation which I think that is suitable for the single-
+threaded situation.
+2. Efforts on `timeout`
+net.Conn interface supplies the function `SetWriteDeadline` and
+`SetReadDeadline`. `SetWriteDeadline` is alright for the case. However,
+`SetReadDeadline` does not acts as what I expect. Anyway, if I use the
+function to set a read deadline, the reading may interrupt when the data is
+on the way from the server to the client, that is, next time when the client
+send the new request to the server, it may recognize the last response as the
+correspond response. Fatally the case will chain up all subsequent responses
+parsed by the consumer. So instead I start a new goroutine to wait for and
+parse the response when the client need to read from the connection. When it
+is timeout, the consumer will stops waiting for the signal that response is
+reached and continues to wait for another request sent to the consumer, but
+the goroutine will still hang until the response is reached. In this way, I
+manage to prevent from reading the last response.
+ */
 func (c *Client) consume(ts []*token.Token, rspCh chan *Response) {
 	defer close(rspCh)
 	buffer := &bytes.Buffer{}
