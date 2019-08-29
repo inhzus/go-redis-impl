@@ -48,16 +48,13 @@ func NewProcessor(n int) *Processor {
 		cds.Unwatch: p.unwatch,
 		cds.Watch:   p.watch,
 	}
-	p.data = make([]*model.DataStorage, n)
-	for i := 0; i < n; i++ {
-		p.data[i] = model.NewDataStorage()
-	}
+	p.data = model.NewDataArray(n)
 	return p
 }
 
 // NewClient generates a new client.
-func (p *Processor) NewClient(conn net.Conn, idx int, ch chan *model.SetMsg) *model.Client {
-	return model.NewClient(conn, p.data[idx], idx, ch)
+func (p *Processor) NewClient(conn net.Conn, idx int) *model.Client {
+	return model.NewClient(conn, p.data[idx])
 }
 
 // GenBin is a generator which yields every key-value pair of the original data.
@@ -290,7 +287,6 @@ func (p *Processor) sel(cli *model.Client, tokens ...*token.Token) *token.Token 
 		return token.NewError(err.Error())
 	}
 	idx := int(tokens[0].Data.(int64))
-	cli.Idx = idx
 	cli.Data = p.data[idx]
 	return token.ReplyOk
 }

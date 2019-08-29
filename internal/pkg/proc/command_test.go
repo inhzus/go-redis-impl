@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
+	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ var proc *Processor
 
 func init() {
 	proc = NewProcessor(16)
-	cli = model.NewClient(nil, proc.data[0], 0, nil)
+	cli = model.NewClient(nil, proc.data[0])
 }
 
 func TestProcessor_ping(t *testing.T) {
@@ -244,7 +245,7 @@ func TestProcessor_exec(t *testing.T) {
 	key := "t_exec"
 	oldValue := "old value"
 	newValue := "new value"
-	c := model.NewClient(nil, proc.data[0], 0, nil)
+	c := model.NewClient(nil, proc.data[0])
 	assert.Equal(t, token.NewError("exec without multi"), proc.exec(cli))
 	assert.Equal(t, token.ReplyOk, proc.multi(cli))
 
@@ -278,7 +279,7 @@ func TestProcessor_discard(t *testing.T) {
 }
 
 func TestProcessor_watch(t *testing.T) {
-	c := model.NewClient(nil, proc.data[0], 0, nil)
+	c := model.NewClient(nil, proc.data[0])
 	key := "t_watch"
 	assert.Equal(t, token.NewError(eStrArgMore),
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch))))
@@ -318,7 +319,7 @@ func TestProcessor_watch(t *testing.T) {
 }
 
 func TestProcessor_unwatch(t *testing.T) {
-	c := model.NewClient(nil, proc.data[0], 0, nil)
+	c := model.NewClient(nil, proc.data[0])
 	key := "t_unwatch"
 	assert.Equal(t, token.ReplyOk,
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
@@ -349,7 +350,7 @@ func TestProcessor_unwatch(t *testing.T) {
 
 func TestProcessor_sel(t *testing.T) {
 	key := "t_sel"
-	c := model.NewClient(nil, proc.data[0], 0, nil)
+	c := model.NewClient(nil, proc.data[0])
 	assert.Equal(t, token.NewError(eStrArgMore), proc.sel(cli))
 	assert.Equal(t, token.NewError("type of index is string instead of integer"), proc.sel(cli, token.NewString("1")))
 	assert.Equal(t, token.ReplyOk, proc.sel(cli, token.NewInteger(1)))

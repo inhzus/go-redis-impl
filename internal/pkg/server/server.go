@@ -66,7 +66,7 @@ func NewServer(option *Option) *Server {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := s.proc.NewClient(conn, 0, s.setCh)
+	cli := s.proc.NewClient(conn, 0)
 	for {
 		ts, err := token.Deserialize(conn)
 		var data []byte

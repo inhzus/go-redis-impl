@@ -54,6 +54,7 @@ type DataStorage struct {
 	// status moving means moving new data back to origin data
 	isMoving bool
 	isBlock  bool
+	idx      int
 }
 
 // NewDataStorage returns data storage entity with default constructor
@@ -61,9 +62,23 @@ func NewDataStorage() *DataStorage {
 	return &DataStorage{data: make(map[string]*Item), queue: &priorityQueue{}, watch: newWatchMap()}
 }
 
+func NewDataArray(n int) []*DataStorage {
+	var d = make([]*DataStorage, n)
+	for i := 0; i < n; i++ {
+		d[i] = NewDataStorage()
+		d[i].idx = i
+	}
+	return d
+}
+
 // GetOrigin returns the original data of the data storage.
 func (d *DataStorage) GetOrigin() map[string]*Item {
 	return d.oldData
+}
+
+// Idx returns the index position in the data array
+func (d *DataStorage) Idx() int {
+	return d.idx
 }
 
 // Freeze and following logic ensure the origin data won't change until "ToMove"

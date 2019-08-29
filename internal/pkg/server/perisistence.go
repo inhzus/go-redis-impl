@@ -111,7 +111,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader := bufio.NewReader(rcl)
-	cli := s.proc.NewClient(nil, 0, nil)
+	cli := s.proc.NewClient(nil, 0)
 	// restore from the rcl
 	ch := make(chan *token.Token)
 	for t := range token.DeserializeGenerator(reader) {
@@ -123,7 +123,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader = bufio.NewReader(aof)
-	cli = s.proc.NewClient(nil, 0, nil)
+	cli = s.proc.NewClient(nil, 0)
 	for t := range token.DeserializeGenerator(reader) {
 		s.queue <- &model.CmdTask{Cli: cli, Req: t.T, Rsp: ch}
 		<-ch
@@ -153,8 +153,8 @@ func (s *Server) persistence() {
 	var buffer bytes.Buffer
 	for {
 		select {
-		// flush the aof file periodically
 		case <-flushTicker.C:
+			// flush the aof file periodically
 			if buffer.Len() > 0 {
 				_, err = buffer.WriteTo(file)
 				if err != nil {
@@ -165,8 +165,8 @@ func (s *Server) persistence() {
 					glog.Errorf("file sync: %v", err.Error())
 				}
 			}
-			// receive the set msgs from the model clients and sync them to the aof
 		case m := <-s.setCh:
+			// receive the set msgs from the model clients and sync them to the aof
 			d, _ := m.T.Serialize()
 			if m.Idx != idx {
 				d, _ = token.NewArray(token.NewString(cds.Select), token.NewInteger(int64(m.Idx))).Serialize()
