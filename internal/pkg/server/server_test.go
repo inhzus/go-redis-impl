@@ -38,7 +38,7 @@ func TestServer_Serve(t *testing.T) {
 	}
 	for _, r := range res {
 		assert.Nil(t, r.Err, nil)
-		assert.Equal(t, r.Data, token.ReplyOk)
+		assert.True(t, r.Data.Equal(token.ReplyOk))
 	}
 	res = nil
 	for i := 0; i < 20; i++ {

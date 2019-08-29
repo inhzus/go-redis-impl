@@ -12,14 +12,19 @@ var (
 	ProtocolSeps       = []byte("\r\n")
 	NilData            = []byte("-1\r\n")
 	NilBulkedLen int64 = -1
-	ErrorDefault       = NewError("error")
 	ReplyOk            = NewString("ok")
 	ReplyQueued        = NewString("queued")
 )
 
+const (
+	// value stored changed
+	FlagSet = 1 << iota
+)
+
 type Token struct {
-	Label byte
 	Data  interface{}
+	Flag  uint64
+	Label byte
 }
 
 func (t *Token) Serialize() ([]byte, error) {
@@ -89,4 +94,8 @@ func (t *Token) Error() error {
 
 func (t *Token) Value() interface{} {
 	return t.Data
+}
+
+func (t *Token) Equal(o *Token) bool {
+	return t.Data == o.Data && t.Label == o.Label
 }

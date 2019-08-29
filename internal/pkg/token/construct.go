@@ -7,26 +7,26 @@ import (
 )
 
 func NewString(s string) *Token {
-	return &Token{label.String, s}
+	return &Token{Label: label.String, Data: s}
 }
 
 func NewError(format string, a ...interface{}) *Token {
 	if len(a) != 0 {
 		format = fmt.Sprintf(format, a...)
 	}
-	return &Token{label.Error, format}
+	return &Token{Label: label.Error, Data: format}
 }
 
 func NewInteger(num int64) *Token {
-	return &Token{label.Integer, num}
+	return &Token{Label: label.Integer, Data: num}
 }
 
 func NewBulked(data interface{}) *Token {
-	return &Token{label.Bulked, data}
+	return &Token{Label: label.Bulked, Data: data}
 }
 
 func NewArray(tokens ...*Token) *Token {
-	return &Token{label.Array, tokens}
+	return &Token{Label: label.Array, Data: tokens}
 }
 
 func NewToken(v interface{}) *Token {

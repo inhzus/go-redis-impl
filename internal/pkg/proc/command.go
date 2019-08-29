@@ -78,13 +78,8 @@ func (p *Processor) GenBin(idx int, ch chan<- []byte) {
 	}
 }
 
-// GetData returns the data storage at the given index.
-func (p *Processor) GetData(idx int) *model.DataStorage {
-	return p.data[idx]
-}
-
 // execCmd returns result of parsing request command and arguments
-func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
+func (p *Processor) execCmd(cli *model.Client, req *token.Token) (ret *token.Token) {
 	if req == nil {
 		return token.NewError("empty request")
 	}
@@ -105,9 +100,18 @@ func (p *Processor) execCmd(cli *model.Client, req *token.Token) *token.Token {
 		}
 	}
 	if proc, ok := p.ctrlMap[cmd.Data.(string)]; ok {
-		return proc(cli, args...)
+		ret = proc(cli, args...)
+	} else {
+		ret = token.NewError("unrecognized command")
 	}
-	return token.NewError("unrecognized command")
+	if ret.Label == label.Error {
+		return
+	}
+	switch cmd.Data.(string) {
+	case cds.Incr, cds.Desc, cds.Set:
+		ret.Flag |= token.FlagSet
+	}
+	return
 }
 
 func (p *Processor) execMod(cmd string, index int) error {
