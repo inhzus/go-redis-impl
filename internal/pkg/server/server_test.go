@@ -14,11 +14,13 @@ import (
 var s *Server
 
 func init() {
-	//s = NewServer(&Option{})
+	s = NewServer(&Option{})
+	s.option.Persist.Enable = false
+	s.option.Persist.SaveCopy = false
 }
 
 func TestServer_Serve(t *testing.T) {
-	//go s.Serve()
+	go s.Serve()
 	<-time.After(time.Second)
 	cli := client.NewClient(&client.Option{})
 	err := cli.Connect()
@@ -53,5 +55,5 @@ func TestServer_Serve(t *testing.T) {
 		t.Logf(err.Error())
 	}
 	cli.Close()
-	//s.Close()
+	s.Close()
 }
