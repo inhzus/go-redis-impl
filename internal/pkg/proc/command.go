@@ -29,6 +29,9 @@ const (
 type Processor struct {
 	ctrlMap map[string]func(*model.Client, ...*token.Token) *token.Token
 	data    []*model.DataStorage
+	Msgs    struct {
+		Set chan *SetMsg
+	}
 }
 
 // NewProcessor returns a pointer to the processor which has initialized
@@ -49,12 +52,18 @@ func NewProcessor(n int) *Processor {
 		cds.Watch:   p.watch,
 	}
 	p.data = model.NewDataArray(n)
+	p.Msgs.Set = make(chan *SetMsg)
 	return p
 }
 
-// NewClient generates a new client.
-func (p *Processor) NewClient(conn net.Conn, idx int) *model.Client {
-	return model.NewClient(conn, p.data[idx])
+// NewMockClient returns a new mock client without conn.
+func (p *Processor) NewMockClient() *model.Client {
+	return model.NewClient(nil, p.data[0])
+}
+
+// NewClient returns a new client collecting stat.
+func (p *Processor) NewClient(conn net.Conn) *model.Client {
+	return &model.Client{Conn: conn, Data: p.data[0], Multi: &model.MultiInfo{}, Stat: true}
 }
 
 // GenBin is a generator which yields every key-value pair of the original data.
@@ -101,7 +110,7 @@ func (p *Processor) execCmd(cli *model.Client, req *token.Token) (ret *token.Tok
 	} else {
 		ret = token.NewError("unrecognized command")
 	}
-	if ret.Label == label.Error {
+	if ret.Label == label.Error || !cli.Stat {
 		return
 	}
 	switch cmd.Data.(string) {
@@ -125,7 +134,11 @@ func (p *Processor) execMod(cmd string, index int) error {
 func (p *Processor) Do(tsk task.Task) {
 	switch t := tsk.(type) {
 	case *model.CmdTask:
-		t.Rsp <- p.execCmd(t.Cli, t.Req)
+		rsp := p.execCmd(t.Cli, t.Req)
+		t.Rsp <- rsp
+		if rsp.Flag&token.FlagSet > 0 {
+			p.Msgs.Set <- &SetMsg{t.Cli.Data.Idx(), t.Req}
+		}
 	case *model.ModTask:
 		t.Rsp <- p.execMod(t.Cmd, t.DataIdx)
 	}

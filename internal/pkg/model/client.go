@@ -25,7 +25,8 @@ type Client struct {
 	Data *DataStorage
 	// transaction info
 	Multi *MultiInfo
-	SetCh chan *SetMsg
+	// collect stat
+	Stat bool
 }
 
 // NewClient returns a client selecting database 0, transaction state false

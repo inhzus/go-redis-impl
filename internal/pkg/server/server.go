@@ -33,7 +33,6 @@ type Server struct {
 	queue  chan task.Task
 	stop   chan struct{}
 	proc   *proc.Processor
-	setCh  chan *model.SetMsg
 }
 
 // NewServer returns a new server pointer with default config
@@ -66,7 +65,7 @@ func NewServer(option *Option) *Server {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	glog.Infof("client %v connection established", conn.RemoteAddr())
-	cli := s.proc.NewClient(conn, 0)
+	cli := s.proc.NewClient(conn)
 	for {
 		ts, err := token.Deserialize(conn)
 		var data []byte
@@ -105,7 +104,6 @@ func (s *Server) Serve() {
 	checkErr(err)
 	s.queue = make(chan task.Task)
 	s.stop = make(chan struct{})
-	s.setCh = make(chan *model.SetMsg)
 	s.proc = proc.NewProcessor(s.option.DBCount)
 	go func() {
 		for {

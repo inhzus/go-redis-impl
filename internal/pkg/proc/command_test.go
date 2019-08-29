@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/inhzus/go-redis-impl/internal/pkg/cds"
-	"github.com/inhzus/go-redis-impl/internal/pkg/label"
 	"github.com/inhzus/go-redis-impl/internal/pkg/model"
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 	"github.com/stretchr/testify/assert"
@@ -310,7 +309,7 @@ func TestProcessor_watch(t *testing.T) {
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Watch), token.NewString(key))))
 	assert.Equal(t, token.ReplyOk,
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Multi))))
-	assert.Equal(t, &token.Token{Data: int64(4), Flag: 1, Label: label.Integer},
+	assert.Equal(t, token.NewInteger(4),
 		proc.execCmd(c, token.NewArray(token.NewString(cds.Incr), token.NewString(key))))
 	assert.Equal(t, token.ReplyQueued,
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Get), token.NewString(key))))
@@ -369,9 +368,9 @@ func TestProcessor_Exec(t *testing.T) {
 		proc.execCmd(cli, token.NewArray(token.NewBulked([]byte(cds.Get)))))
 	assert.Equal(t, token.NewString(strPong),
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Ping))))
-	assert.Equal(t, &token.Token{Data: int64(-1), Flag: 1, Label: label.Integer},
+	assert.Equal(t, token.NewInteger(-1),
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Desc), token.NewString("t_process"))))
-	assert.Equal(t, &token.Token{Data: int64(0), Flag: 1, Label: label.Integer},
+	assert.Equal(t, token.NewInteger(0),
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Incr), token.NewString("t_process"))))
 	assert.Equal(t, token.ReplyOk,
 		proc.execCmd(cli, token.NewArray(token.NewString(cds.Select), token.NewInteger(2))))

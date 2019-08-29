@@ -111,7 +111,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader := bufio.NewReader(rcl)
-	cli := s.proc.NewClient(nil, 0)
+	cli := s.proc.NewMockClient()
 	// restore from the rcl
 	ch := make(chan *token.Token)
 	for t := range token.DeserializeGenerator(reader) {
@@ -123,7 +123,7 @@ func (s *Server) restoreData() {
 	checkErr(err)
 	defer func() { _ = rcl.Close() }()
 	reader = bufio.NewReader(aof)
-	cli = s.proc.NewClient(nil, 0)
+	cli = s.proc.NewMockClient()
 	for t := range token.DeserializeGenerator(reader) {
 		s.queue <- &model.CmdTask{Cli: cli, Req: t.T, Rsp: ch}
 		<-ch
@@ -165,7 +165,7 @@ func (s *Server) persistence() {
 					glog.Errorf("file sync: %v", err.Error())
 				}
 			}
-		case m := <-s.setCh:
+		case m := <-s.proc.Msgs.Set:
 			// receive the set msgs from the model clients and sync them to the aof
 			d, _ := m.T.Serialize()
 			if m.Idx != idx {
