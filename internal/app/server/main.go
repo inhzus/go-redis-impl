@@ -46,13 +46,14 @@ func getOption() *server.Option {
 	flag.StringVar(&opt.Proto, "protocol", "tcp", "protocol")
 	flag.StringVar(&host, "host", "127.0.0.1", "host")
 	flag.StringVar(&port, "port", "6389", "port")
-	flag.BoolVar(&opt.Persist.Enable, "persist", true, "enable auto restore from persistence file")
-	flag.BoolVar(&opt.Persist.SaveCopy, "copy", false, "enable save persistence file with timestamp")
+	flag.BoolVar(&opt.Persist.Enable, "dr", false, "disable auto restore from persistence file")
+	flag.BoolVar(&opt.Persist.SaveCopy, "es", false, "enable save persistence file with timestamp")
 	flag.StringVar(&flushInterval, "fi", "1s", "flushing to aof interval, format: 1Y2M3D4h5m6s")
 	flag.StringVar(&rewriteInterval, "ri", "1h", "rewriting rcl interval, format: 1Y2M3D4h5m6s")
 	opt.Persist.FlushInr = parseDuration(flushInterval)
 	opt.Persist.RewriteInr = parseDuration(rewriteInterval)
 	flag.Parse()
+	opt.Persist.Enable = !opt.Persist.Enable
 	return opt
 }
 
