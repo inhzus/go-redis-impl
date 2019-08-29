@@ -5,13 +5,6 @@ import (
 	"github.com/inhzus/go-redis-impl/internal/pkg/token"
 )
 
-// SetMsg is the structure hold by the channel which sends message from
-// model clients to server persistence goroutine.
-type SetMsg struct {
-	Idx int
-	T   *token.Token
-}
-
 // ModTask is the structure hold by the channel which sends task to control
 // data persistence from server persistence goroutine to processor.
 type ModTask struct {
@@ -28,7 +21,6 @@ type CmdTask struct {
 	Rsp chan *token.Token
 }
 
-// These functions prevent type cast from interface to Msg or Task.
-func (m *SetMsg) Msg() task.Msg    { return m }
+// Task prevents type cast from interface to Task.
 func (t *ModTask) Task() task.Task { return t }
 func (t *CmdTask) Task() task.Task { return t }
