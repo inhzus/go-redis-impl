@@ -95,22 +95,22 @@ func (d *DataStorage) scanPop(n int) {
 	if d.isBlock {
 		return
 	}
-	queue := d.queue
-	data := d.data
+	queue := &d.queue
+	data := &d.data
 	// When moving, origin data is able to check expired again.
 	if d.isMoving {
-		queue = d.oldQueue
-		data = d.oldData
+		queue = &d.oldQueue
+		data = &d.oldData
 	}
 	now := time.Now().UnixNano()
 	for i := 0; i < checkExpireNum; i++ {
-		top := queue.Top()
+		top := (*queue).Top()
 		if top == nil {
 			return
 		}
 		if top.Expire > 0 && top.Expire < now {
-			heap.Pop(queue)
-			delete(data, top.key)
+			heap.Pop(*queue)
+			delete(*data, top.key)
 		} else {
 			return
 		}
@@ -166,8 +166,8 @@ func (d *DataStorage) Get(key string) interface{} {
 // Set puts the new value of key
 func (d *DataStorage) Set(key string, value interface{}, expire int64) interface{} {
 	d.scanPop(checkExpireNum)
-	data := d.data
-	queue := d.queue
+	data := &d.data
+	queue := &d.queue
 	if !d.resetIfMoved() {
 		d.moveBack(moveBackNum)
 		// When moving, set data into origin data and delete the one in new data.
@@ -176,18 +176,18 @@ func (d *DataStorage) Set(key string, value interface{}, expire int64) interface
 			heap.Remove(d.queue, item.index)
 			delete(d.data, key)
 		}
-		data = d.oldData
-		queue = d.oldQueue
+		data = &d.oldData
+		queue = &d.oldQueue
 	}
 
-	item, ok := data[key]
+	item, ok := (*data)[key]
 	if ok {
 		item.fix(value, expire)
-		heap.Fix(queue, item.index)
+		heap.Fix(*queue, item.index)
 	} else {
 		item = newItem(key, value, expire)
-		data[key] = item
-		heap.Push(queue, item)
+		(*data)[key] = item
+		heap.Push(*queue, item)
 	}
 	return item.Row
 }
