@@ -34,25 +34,24 @@ The project is aiming to implement redis in golang
 
   The client can support all commands with server library
 
+- CLI
+
 - Basic read/write
 
   Supported read/write commands: set, get, incr, desc etc.
 
 - Single-threaded server
 
-- Resonable TCP protocol
+- Reasonable TCP protocol
 
   Protocol is similar to the one of original redis
 
-
 # TODO
 
-1. CLI
+1. Sub / Pub
 
-2. Sub / Pub
+2. Testcase for persistence
 
-3. Testcases for persistence
+3. More detailed commands e.g. ttl, expire etc.
 
-4. More detailed commands e.g. ttl, expire etc.
-
-5. More data types e.g. set, ordered set, hash etc.
+4. More data types e.g. set, ordered set, hash etc.
