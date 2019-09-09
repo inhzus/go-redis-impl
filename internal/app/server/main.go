@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"regexp"
 	"strconv"
 	"time"
@@ -50,9 +51,10 @@ func getOption() *server.Option {
 	flag.BoolVar(&opt.Persist.SaveCopy, "es", false, "enable save persistence file with timestamp")
 	flag.StringVar(&flushInterval, "fi", "1s", "flushing to aof interval, format: 1Y2M3D4h5m6s")
 	flag.StringVar(&rewriteInterval, "ri", "1h", "rewriting rcl interval, format: 1Y2M3D4h5m6s")
+	flag.Parse()
+	opt.Addr = fmt.Sprintf("%s:%s", host, port)
 	opt.Persist.FlushInr = parseDuration(flushInterval)
 	opt.Persist.RewriteInr = parseDuration(rewriteInterval)
-	flag.Parse()
 	opt.Persist.Enable = !opt.Persist.Enable
 	return opt
 }
